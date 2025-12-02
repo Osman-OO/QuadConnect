@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:timeago/timeago.dart' as timeago;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/quad_avatar.dart';
 import '../../../core/widgets/quad_card.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../providers/feed_provider.dart';
+import '../models/post_model.dart';
 
 class FeedScreen extends ConsumerWidget {
   const FeedScreen({super.key});
@@ -11,6 +14,7 @@ class FeedScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authNotifierProvider);
+    final feedState = ref.watch(feedProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -31,143 +35,232 @@ class FeedScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
-            onPressed: () {
-              // TODO: Implement search
-            },
+            onPressed: () => _showSearchDialog(context),
           ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {
-              // TODO: Implement notifications
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Notifications coming soon!')),
+              );
             },
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          // TODO: Refresh feed
+          // Refresh happens automatically via stream
+          await Future.delayed(const Duration(milliseconds: 500));
         },
         child: CustomScrollView(
           slivers: [
             // Create post prompt
             SliverToBoxAdapter(
-              child: _buildCreatePostCard(context, authState),
+              child: _buildCreatePostCard(context, ref, authState),
             ),
 
-            // Posts list - placeholder for now
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildPostCard(context, index),
-                childCount: 5, // Placeholder posts
+            // Loading state
+            if (feedState.isLoading)
+              const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              )
+            // Error state
+            else if (feedState.error != null)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: AppColors.error,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Error loading feed',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        feedState.error!,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            // Empty state
+            else if (feedState.posts.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.article_outlined,
+                        size: 64,
+                        color: AppColors.textTertiary,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No posts yet',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Be the first to share something!',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            // Posts list
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) =>
+                      _buildPostCard(context, ref, feedState.posts[index]),
+                  childCount: feedState.posts.length,
+                ),
               ),
-            ),
 
-            // Bottom padding
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 80),
-            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 80)),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Create new post
-        },
+        onPressed: () => _showCreatePostSheet(context, ref),
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildCreatePostCard(BuildContext context, AuthState authState) {
-    return QuadCard(
-      margin: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          QuadAvatar(
-            imageUrl: authState.user?.photoUrl,
-            initials: authState.user?.initials ?? '?',
-            size: 44,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Text(
-                "What's on your mind?",
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
+  void _showSearchDialog(BuildContext context) {
+    showSearch(context: context, delegate: PostSearchDelegate());
+  }
+
+  /// Show bottom sheet for creating a new post
+  void _showCreatePostSheet(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 20,
+          right: 20,
+          top: 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Create Post',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: InputDecoration(
+                hintText: "What's on your mind?",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: AppColors.surfaceVariant,
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.image_outlined, color: AppColors.success),
-            onPressed: () {
-              // TODO: Add image
-            },
-          ),
-        ],
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () async {
+                if (controller.text.trim().isNotEmpty) {
+                  await ref
+                      .read(feedProvider.notifier)
+                      .createPost(content: controller.text.trim());
+                  if (context.mounted) Navigator.pop(context);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Post'),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildPostCard(BuildContext context, int index) {
-    // Placeholder post for demo
-    final posts = [
-      {
-        'author': 'Sarah Chen',
-        'initials': 'SC',
-        'time': '2 hours ago',
-        'content':
-            'Just finished the Computer Science midterm! 🎉 Who else is relieved? Time for coffee at the library cafe ☕',
-        'likes': 42,
-        'comments': 8,
-      },
-      {
-        'author': 'Marcus Johnson',
-        'initials': 'MJ',
-        'time': '4 hours ago',
-        'content':
-            'Anyone want to form a study group for Organic Chemistry? Meeting at the Quad tomorrow at 3pm. Bring snacks! 📚',
-        'likes': 28,
-        'comments': 15,
-      },
-      {
-        'author': 'Photography Club',
-        'initials': 'PC',
-        'time': '6 hours ago',
-        'content':
-            'Sunset photowalk this Friday! 🌅 Meet at the main fountain at 5pm. All skill levels welcome. Bring your cameras or just your phone!',
-        'likes': 89,
-        'comments': 12,
-      },
-      {
-        'author': 'Emily Rodriguez',
-        'initials': 'ER',
-        'time': '1 day ago',
-        'content':
-            'Lost my blue water bottle somewhere between the gym and the engineering building. If anyone finds it, please let me know! 💙',
-        'likes': 5,
-        'comments': 3,
-      },
-      {
-        'author': 'Student Government',
-        'initials': 'SG',
-        'time': '1 day ago',
-        'content':
-            '🗳️ VOTING IS OPEN! Cast your vote for next year\'s student body president. Polls close Friday at midnight. Your voice matters!',
-        'likes': 156,
-        'comments': 24,
-      },
-    ];
+  Widget _buildCreatePostCard(
+    BuildContext context,
+    WidgetRef ref,
+    AuthState authState,
+  ) {
+    return GestureDetector(
+      onTap: () => _showCreatePostSheet(context, ref),
+      child: QuadCard(
+        margin: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            QuadAvatar(
+              imageUrl: authState.user?.photoUrl,
+              initials: authState.user?.initials ?? '?',
+              size: 44,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Text(
+                  "What's on your mind?",
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.image_outlined, color: AppColors.success),
+              onPressed: () => _showCreatePostSheet(context, ref),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    final post = posts[index % posts.length];
-
+  Widget _buildPostCard(BuildContext context, WidgetRef ref, PostModel post) {
     return QuadCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,18 +268,24 @@ class FeedScreen extends ConsumerWidget {
           // Author row
           Row(
             children: [
-              QuadAvatar(initials: post['initials'] as String, size: 44),
+              QuadAvatar(
+                imageUrl: post.authorPhotoUrl,
+                initials: post.authorName.isNotEmpty
+                    ? post.authorName[0].toUpperCase()
+                    : '?',
+                size: 44,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      post['author'] as String,
+                      post.authorName,
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     Text(
-                      post['time'] as String,
+                      timeago.format(post.createdAt),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
@@ -194,45 +293,108 @@ class FeedScreen extends ConsumerWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.more_horiz),
-                onPressed: () {},
+                onPressed: () => _showPostOptions(context, ref, post),
               ),
             ],
           ),
-
           const SizedBox(height: 12),
-
-          // Content
-          Text(post['content'] as String),
-
+          Text(post.content),
+          if (post.hasImages) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(post.imageUrls.first, fit: BoxFit.cover),
+            ),
+          ],
           const SizedBox(height: 16),
-
-          // Actions row
-          Row(
-            children: [
-              _buildActionButton(
-                context,
-                Icons.favorite_border,
-                '${post['likes']}',
-                AppColors.error,
-              ),
-              const SizedBox(width: 24),
-              _buildActionButton(
-                context,
-                Icons.chat_bubble_outline,
-                '${post['comments']}',
-                AppColors.primary,
-              ),
-              const SizedBox(width: 24),
-              _buildActionButton(
-                context,
-                Icons.share_outlined,
-                'Share',
-                AppColors.textSecondary,
-              ),
-            ],
-          ),
+          // Actions row with real-time like status
+          _PostActions(post: post),
         ],
       ),
+    );
+  }
+
+  void _showPostOptions(BuildContext context, WidgetRef ref, PostModel post) {
+    final authState = ref.read(authNotifierProvider);
+    final isAuthor = authState.user?.uid == post.authorId;
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isAuthor)
+              ListTile(
+                leading: const Icon(Icons.delete, color: AppColors.error),
+                title: const Text('Delete Post'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await ref.read(feedProvider.notifier).deletePost(post.id);
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.share),
+              title: const Text('Share'),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.flag_outlined),
+              title: const Text('Report'),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Separate widget for post actions to handle like state
+class _PostActions extends ConsumerWidget {
+  final PostModel post;
+  const _PostActions({required this.post});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final likeStatus = ref.watch(postLikeStatusProvider(post.id));
+    final isLiked = likeStatus.maybeWhen(data: (v) => v, orElse: () => false);
+
+    return Row(
+      children: [
+        _buildActionButton(
+          context,
+          isLiked ? Icons.favorite : Icons.favorite_border,
+          '${post.likesCount}',
+          isLiked ? AppColors.error : AppColors.textSecondary,
+          () => ref.read(feedProvider.notifier).toggleLike(post.id),
+        ),
+        const SizedBox(width: 24),
+        _buildActionButton(
+          context,
+          Icons.chat_bubble_outline,
+          '${post.commentsCount}',
+          AppColors.primary,
+          () => _showComments(context, ref),
+        ),
+        const SizedBox(width: 24),
+        _buildActionButton(
+          context,
+          Icons.share_outlined,
+          'Share',
+          AppColors.textSecondary,
+          () {},
+        ),
+      ],
+    );
+  }
+
+  void _showComments(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _CommentsSheet(postId: post.id),
     );
   }
 
@@ -241,9 +403,10 @@ class FeedScreen extends ConsumerWidget {
     IconData icon,
     String label,
     Color color,
+    VoidCallback onTap,
   ) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -253,9 +416,9 @@ class FeedScreen extends ConsumerWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -264,3 +427,159 @@ class FeedScreen extends ConsumerWidget {
   }
 }
 
+/// Comments bottom sheet
+class _CommentsSheet extends ConsumerStatefulWidget {
+  final String postId;
+  const _CommentsSheet({required this.postId});
+
+  @override
+  ConsumerState<_CommentsSheet> createState() => _CommentsSheetState();
+}
+
+class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
+  final _controller = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    final comments = ref.watch(postCommentsProvider(widget.postId));
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Comments', style: Theme.of(context).textTheme.titleLarge),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: comments.when(
+              data: (list) => list.isEmpty
+                  ? const Center(child: Text('No comments yet'))
+                  : ListView.builder(
+                      itemCount: list.length,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemBuilder: (context, index) {
+                        final comment = list[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              QuadAvatar(
+                                initials: comment.authorName[0],
+                                size: 32,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      comment.authorName,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall,
+                                    ),
+                                    Text(comment.content),
+                                    Text(
+                                      timeago.format(comment.createdAt),
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    decoration: InputDecoration(
+                      hintText: 'Write a comment...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.send, color: AppColors.primary),
+                  onPressed: () async {
+                    if (_controller.text.trim().isNotEmpty) {
+                      await ref.read(addCommentProvider)(
+                        widget.postId,
+                        _controller.text.trim(),
+                      );
+                      _controller.clear();
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Search delegate for posts
+class PostSearchDelegate extends SearchDelegate<String> {
+  @override
+  List<Widget> buildActions(BuildContext context) => [
+    IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
+  ];
+
+  @override
+  Widget buildLeading(BuildContext context) => IconButton(
+    icon: const Icon(Icons.arrow_back),
+    onPressed: () => close(context, ''),
+  );
+
+  @override
+  Widget buildResults(BuildContext context) => _buildSearchResults();
+
+  @override
+  Widget buildSuggestions(BuildContext context) => _buildSearchResults();
+
+  Widget _buildSearchResults() {
+    if (query.isEmpty) {
+      return const Center(child: Text('Search for posts, people, or topics'));
+    }
+    return Center(child: Text('Search results for "$query"'));
+  }
+}
