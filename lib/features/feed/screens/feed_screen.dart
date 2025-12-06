@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/animated_button.dart';
 import '../../../core/widgets/quad_avatar.dart';
 import '../../../core/widgets/quad_card.dart';
+import '../../../core/widgets/skeleton_loader.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/feed_provider.dart';
 import '../models/post_model.dart';
@@ -59,10 +61,13 @@ class FeedScreen extends ConsumerWidget {
               child: _buildCreatePostCard(context, ref, authState),
             ),
 
-            // Loading state
+            // Loading state with skeleton
             if (feedState.isLoading)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => const PostCardSkeleton(),
+                  childCount: 5,
+                ),
               )
             // Error state
             else if (feedState.error != null)
@@ -116,13 +121,16 @@ class FeedScreen extends ConsumerWidget {
                   ),
                 ),
               )
-            // Posts list
+            // Posts list (using filtered posts)
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) =>
-                      _buildPostCard(context, ref, feedState.posts[index]),
-                  childCount: feedState.posts.length,
+                  (context, index) => _buildPostCard(
+                    context,
+                    ref,
+                    feedState.filteredPosts[index],
+                  ),
+                  childCount: feedState.filteredPosts.length,
                 ),
               ),
 
@@ -362,12 +370,28 @@ class _PostActions extends ConsumerWidget {
 
     return Row(
       children: [
-        _buildActionButton(
-          context,
-          isLiked ? Icons.favorite : Icons.favorite_border,
-          '${post.likesCount}',
-          isLiked ? AppColors.error : AppColors.textSecondary,
-          () => ref.read(feedProvider.notifier).toggleLike(post.id),
+        // Animated like button
+        GestureDetector(
+          onTap: () => ref.read(feedProvider.notifier).toggleLike(post.id),
+          child: Row(
+            children: [
+              AnimatedLikeButton(
+                isLiked: isLiked,
+                onTap: () =>
+                    ref.read(feedProvider.notifier).toggleLike(post.id),
+                size: 20,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '${post.likesCount}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: isLiked
+                      ? AppColors.secondary
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(width: 24),
         _buildActionButton(
@@ -557,11 +581,15 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
   }
 }
 
-/// Search delegate for posts
+/// Search delegate for posts with real-time filtering
 class PostSearchDelegate extends SearchDelegate<String> {
   @override
+  String get searchFieldLabel => 'Search posts, people, topics...';
+
+  @override
   List<Widget> buildActions(BuildContext context) => [
-    IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
+    if (query.isNotEmpty)
+      IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
   ];
 
   @override
@@ -571,15 +599,95 @@ class PostSearchDelegate extends SearchDelegate<String> {
   );
 
   @override
-  Widget buildResults(BuildContext context) => _buildSearchResults();
+  Widget buildResults(BuildContext context) => _SearchResults(query: query);
 
   @override
-  Widget buildSuggestions(BuildContext context) => _buildSearchResults();
+  Widget buildSuggestions(BuildContext context) => _SearchResults(query: query);
+}
 
-  Widget _buildSearchResults() {
+/// Search results widget
+class _SearchResults extends ConsumerWidget {
+  final String query;
+  const _SearchResults({required this.query});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     if (query.isEmpty) {
-      return const Center(child: Text('Search for posts, people, or topics'));
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search, size: 64, color: AppColors.textTertiary),
+            const SizedBox(height: 16),
+            Text(
+              'Search for posts, people, or topics',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      );
     }
-    return Center(child: Text('Search results for "$query"'));
+
+    final feedState = ref.watch(feedProvider);
+    final searchQuery = query.toLowerCase();
+
+    final results = feedState.posts.where((post) {
+      return post.content.toLowerCase().contains(searchQuery) ||
+          post.authorName.toLowerCase().contains(searchQuery) ||
+          post.tags.any((tag) => tag.toLowerCase().contains(searchQuery));
+    }).toList();
+
+    if (results.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_off, size: 64, color: AppColors.textTertiary),
+            const SizedBox(height: 16),
+            Text(
+              'No results for "$query"',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try different keywords',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: results.length,
+      itemBuilder: (context, index) {
+        final post = results[index];
+        return QuadCard(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            leading: QuadAvatar(
+              imageUrl: post.authorPhotoUrl,
+              initials: post.authorName.isNotEmpty
+                  ? post.authorName[0].toUpperCase()
+                  : '?',
+              size: 40,
+            ),
+            title: Text(post.authorName),
+            subtitle: Text(
+              post.content,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: Text(
+              timeago.format(post.createdAt),
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ),
+        );
+      },
+    );
   }
 }

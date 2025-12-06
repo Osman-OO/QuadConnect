@@ -120,19 +120,69 @@ class EventsNotifier extends Notifier<EventsState> {
     }
   }
 
-  /// Toggle RSVP for an event
-  Future<void> toggleRsvp(String eventId) async {
+  /// Toggle RSVP for an event (with capacity check)
+  Future<bool> toggleRsvp(String eventId) async {
     final authState = ref.read(authNotifierProvider);
-    if (authState.user == null) return;
+    if (authState.user == null) return false;
 
     final userId = authState.user!.uid;
-    // Check current status and toggle
-    final doc = await _firestoreService.events
+
+    // Check current status
+    final attendeeDoc = await _firestoreService.events
         .doc(eventId)
         .collection('attendees')
         .doc(userId)
         .get();
-    await _firestoreService.rsvpEvent(eventId, userId, doc.exists);
+
+    // If already attending, just remove
+    if (attendeeDoc.exists) {
+      await _firestoreService.rsvpEvent(eventId, userId, true);
+      return true;
+    }
+
+    // Check capacity before adding
+    final eventDoc = await _firestoreService.events.doc(eventId).get();
+    final eventData = eventDoc.data() as Map<String, dynamic>?;
+    if (eventData != null) {
+      final maxAttendees = eventData['maxAttendees'] ?? 0;
+      final currentAttendees = eventData['attendeesCount'] ?? 0;
+
+      // If capacity is set and full, don't allow RSVP
+      if (maxAttendees > 0 && currentAttendees >= maxAttendees) {
+        state = state.copyWith(error: 'This event is at capacity');
+        return false;
+      }
+    }
+
+    await _firestoreService.rsvpEvent(eventId, userId, false);
+    return true;
+  }
+
+  /// Delete an event (only organizer can delete)
+  Future<void> deleteEvent(String eventId) async {
+    final authState = ref.read(authNotifierProvider);
+    if (authState.user == null) return;
+
+    try {
+      final eventDoc = await _firestoreService.events.doc(eventId).get();
+      final eventData = eventDoc.data() as Map<String, dynamic>?;
+
+      if (eventData != null &&
+          eventData['organizerId'] == authState.user!.uid) {
+        await _firestoreService.events.doc(eventId).delete();
+      }
+    } catch (e) {
+      state = state.copyWith(error: 'Failed to delete event: $e');
+    }
+  }
+
+  /// Update an event
+  Future<void> updateEvent(String eventId, Map<String, dynamic> updates) async {
+    try {
+      await _firestoreService.events.doc(eventId).update(updates);
+    } catch (e) {
+      state = state.copyWith(error: 'Failed to update event: $e');
+    }
   }
 }
 

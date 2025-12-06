@@ -12,6 +12,8 @@ class FeedState {
   final bool hasMore;
   final String? error;
   final DocumentSnapshot? lastDocument;
+  final String searchQuery;
+  final String? selectedCategory;
 
   const FeedState({
     this.posts = const [],
@@ -19,7 +21,32 @@ class FeedState {
     this.hasMore = true,
     this.error,
     this.lastDocument,
+    this.searchQuery = '',
+    this.selectedCategory,
   });
+
+  /// Get filtered posts based on search and category
+  List<PostModel> get filteredPosts {
+    var filtered = posts;
+
+    // Filter by search query
+    if (searchQuery.isNotEmpty) {
+      final query = searchQuery.toLowerCase();
+      filtered = filtered.where((post) {
+        return post.content.toLowerCase().contains(query) ||
+            post.authorName.toLowerCase().contains(query);
+      }).toList();
+    }
+
+    // Filter by tag/category
+    if (selectedCategory != null) {
+      filtered = filtered
+          .where((post) => post.tags.contains(selectedCategory))
+          .toList();
+    }
+
+    return filtered;
+  }
 
   FeedState copyWith({
     List<PostModel>? posts,
@@ -27,6 +54,9 @@ class FeedState {
     bool? hasMore,
     String? error,
     DocumentSnapshot? lastDocument,
+    String? searchQuery,
+    String? selectedCategory,
+    bool clearCategory = false,
   }) {
     return FeedState(
       posts: posts ?? this.posts,
@@ -34,6 +64,10 @@ class FeedState {
       hasMore: hasMore ?? this.hasMore,
       error: error,
       lastDocument: lastDocument ?? this.lastDocument,
+      searchQuery: searchQuery ?? this.searchQuery,
+      selectedCategory: clearCategory
+          ? null
+          : (selectedCategory ?? this.selectedCategory),
     );
   }
 }
@@ -53,7 +87,9 @@ class FeedNotifier extends Notifier<FeedState> {
   void _subscribeToFeed() {
     _firestoreService.streamFeed().listen(
       (snapshot) {
-        final posts = snapshot.docs.map((doc) => PostModel.fromFirestore(doc)).toList();
+        final posts = snapshot.docs
+            .map((doc) => PostModel.fromFirestore(doc))
+            .toList();
         state = state.copyWith(
           posts: posts,
           isLoading: false,
@@ -65,6 +101,25 @@ class FeedNotifier extends Notifier<FeedState> {
         state = state.copyWith(isLoading: false, error: error.toString());
       },
     );
+  }
+
+  /// Set search query for filtering posts
+  void setSearchQuery(String query) {
+    state = state.copyWith(searchQuery: query);
+  }
+
+  /// Set category filter
+  void setCategory(String? category) {
+    if (category == null) {
+      state = state.copyWith(clearCategory: true);
+    } else {
+      state = state.copyWith(selectedCategory: category);
+    }
+  }
+
+  /// Clear all filters
+  void clearFilters() {
+    state = state.copyWith(searchQuery: '', clearCategory: true);
   }
 
   /// Create a new post
@@ -119,7 +174,10 @@ final feedProvider = NotifierProvider<FeedNotifier, FeedState>(() {
 });
 
 /// Stream provider for checking if user liked a specific post
-final postLikeStatusProvider = StreamProvider.family<bool, String>((ref, postId) {
+final postLikeStatusProvider = StreamProvider.family<bool, String>((
+  ref,
+  postId,
+) {
   final authState = ref.watch(authNotifierProvider);
   if (authState.user == null) return Stream.value(false);
 
@@ -128,10 +186,17 @@ final postLikeStatusProvider = StreamProvider.family<bool, String>((ref, postId)
 });
 
 /// Stream provider for post comments
-final postCommentsProvider = StreamProvider.family<List<CommentModel>, String>((ref, postId) {
+final postCommentsProvider = StreamProvider.family<List<CommentModel>, String>((
+  ref,
+  postId,
+) {
   final firestoreService = ref.watch(firestoreServiceProvider);
-  return firestoreService.streamComments(postId).map(
-        (snapshot) => snapshot.docs.map((doc) => CommentModel.fromFirestore(doc)).toList(),
+  return firestoreService
+      .streamComments(postId)
+      .map(
+        (snapshot) => snapshot.docs
+            .map((doc) => CommentModel.fromFirestore(doc))
+            .toList(),
       );
 });
 
@@ -153,4 +218,3 @@ final addCommentProvider = Provider((ref) {
     });
   };
 });
-

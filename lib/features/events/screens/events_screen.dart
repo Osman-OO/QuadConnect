@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/quad_card.dart';
+import '../../../core/widgets/skeleton_loader.dart';
 import '../providers/events_provider.dart';
 import '../models/event_model.dart';
 
@@ -69,7 +70,11 @@ class EventsScreen extends ConsumerWidget {
           // Events list with loading/error/empty states
           Expanded(
             child: eventsState.isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 80),
+                    itemCount: 5,
+                    itemBuilder: (context, index) => const EventCardSkeleton(),
+                  )
                 : eventsState.error != null
                 ? Center(child: Text('Error: ${eventsState.error}'))
                 : eventsState.filteredEvents.isEmpty
@@ -488,13 +493,38 @@ class EventsScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${event.attendeesCount} going',
+                      event.maxAttendees > 0
+                          ? '${event.attendeesCount}/${event.maxAttendees} going'
+                          : '${event.attendeesCount} going',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
+                        color: event.isFull
+                            ? AppColors.error
+                            : AppColors.textSecondary,
                       ),
                     ),
+                    if (event.isFull) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'FULL',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: AppColors.error,
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ),
+                    ],
                     const Spacer(),
-                    _RsvpButton(eventId: event.id),
+                    _RsvpButton(eventId: event.id, isFull: event.isFull),
                   ],
                 ),
               ],
@@ -576,23 +606,43 @@ class EventsScreen extends ConsumerWidget {
   }
 }
 
-/// RSVP Button with real-time status
+/// RSVP Button with real-time status and capacity awareness
 class _RsvpButton extends ConsumerWidget {
   final String eventId;
   final bool expanded;
+  final bool isFull;
 
-  const _RsvpButton({required this.eventId, this.expanded = false});
+  const _RsvpButton({
+    required this.eventId,
+    this.expanded = false,
+    this.isFull = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rsvpStatus = ref.watch(eventRsvpStatusProvider(eventId));
     final isRsvped = rsvpStatus.maybeWhen(data: (v) => v, orElse: () => false);
 
+    // Handle RSVP with feedback
+    Future<void> handleRsvp() async {
+      final success = await ref
+          .read(eventsProvider.notifier)
+          .toggleRsvp(eventId);
+      if (!success && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sorry, this event is at capacity!'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+
     if (expanded) {
       return ElevatedButton.icon(
-        onPressed: () => ref.read(eventsProvider.notifier).toggleRsvp(eventId),
-        icon: Icon(isRsvped ? Icons.check : Icons.add),
-        label: Text(isRsvped ? 'Going!' : 'RSVP'),
+        onPressed: (isFull && !isRsvped) ? null : handleRsvp,
+        icon: Icon(isRsvped ? Icons.check : (isFull ? Icons.block : Icons.add)),
+        label: Text(isRsvped ? 'Going!' : (isFull ? 'Full' : 'RSVP')),
         style: ElevatedButton.styleFrom(
           backgroundColor: isRsvped ? AppColors.success : null,
           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -601,13 +651,15 @@ class _RsvpButton extends ConsumerWidget {
     }
 
     return TextButton(
-      onPressed: () => ref.read(eventsProvider.notifier).toggleRsvp(eventId),
+      onPressed: (isFull && !isRsvped) ? null : handleRsvp,
       style: TextButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         minimumSize: const Size(0, 32),
-        foregroundColor: isRsvped ? AppColors.success : null,
+        foregroundColor: isRsvped
+            ? AppColors.success
+            : (isFull ? AppColors.textTertiary : null),
       ),
-      child: Text(isRsvped ? '✓ Going' : 'RSVP'),
+      child: Text(isRsvped ? '✓ Going' : (isFull ? 'Full' : 'RSVP')),
     );
   }
 }
