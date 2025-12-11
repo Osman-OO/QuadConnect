@@ -34,7 +34,7 @@ class ProfileScreen extends ConsumerWidget {
             // Profile header
             _buildProfileHeader(context, user),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
             // Stats row
             _buildStatsRow(context, user),
@@ -162,16 +162,19 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
         ],
-        if (user?.bio != null) ...[
+        if (user?.bio != null && user!.bio!.isNotEmpty) ...[
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              user!.bio!,
+              user.bio!,
               textAlign: TextAlign.center,
               style: Theme.of(
                 context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              ).textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
             ),
           ),
         ],

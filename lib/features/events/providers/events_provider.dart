@@ -62,9 +62,15 @@ class EventsNotifier extends Notifier<EventsState> {
   void _subscribeToEvents() {
     _firestoreService.streamUpcomingEvents().listen(
       (snapshot) {
-        final events = snapshot.docs
-            .map((doc) => EventModel.fromFirestore(doc))
-            .toList();
+        final now = DateTime.now();
+        final events =
+            snapshot.docs
+                .map((doc) => EventModel.fromFirestore(doc))
+                // Filter to upcoming events only (client-side)
+                .where((e) => e.startTime.isAfter(now))
+                .toList()
+              // Sort by start time (client-side)
+              ..sort((a, b) => a.startTime.compareTo(b.startTime));
         state = state.copyWith(events: events, isLoading: false);
       },
       onError: (error) {

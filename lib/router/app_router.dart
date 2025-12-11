@@ -6,6 +6,7 @@ import '../core/widgets/main_shell.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/signup_screen.dart';
+import '../features/auth/screens/splash_screen.dart';
 import '../features/feed/screens/feed_screen.dart';
 import '../features/events/screens/events_screen.dart';
 import '../features/messages/screens/messages_screen.dart';
@@ -21,23 +22,31 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/feed',
-    debugLogDiagnostics: true,
-
+    initialLocation: '/splash',
+    debugLogDiagnostics: false, // Disable for production
     // Redirect based on auth state
     redirect: (context, state) {
       final isAuthenticated = authState.isAuthenticated;
-      final isAuthRoute = state.matchedLocation == '/login' ||
+      final isAuthRoute =
+          state.matchedLocation == '/login' ||
           state.matchedLocation == '/signup' ||
+          state.matchedLocation == '/splash' ||
           state.matchedLocation == '/forgot-password';
+
+      // Allow splash screen always
+      if (state.matchedLocation == '/splash') {
+        return null;
+      }
 
       // If not authenticated and trying to access protected route
       if (!isAuthenticated && !isAuthRoute) {
         return '/login';
       }
 
-      // If authenticated and on auth route, go to feed
-      if (isAuthenticated && isAuthRoute) {
+      // If authenticated and on auth route (except splash), go to feed
+      if (isAuthenticated &&
+          isAuthRoute &&
+          state.matchedLocation != '/splash') {
         return '/feed';
       }
 
@@ -45,11 +54,14 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
 
     routes: [
-      // Auth routes (no shell)
+      // Splash screen
       GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
       ),
+
+      // Auth routes (no shell)
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/signup',
         builder: (context, state) => const SignUpScreen(),
@@ -74,35 +86,28 @@ final routerProvider = Provider<GoRouter>((ref) {
             index = 3;
           }
 
-          return MainShell(
-            currentIndex: index,
-            child: child,
-          );
+          return MainShell(currentIndex: index, child: child);
         },
         routes: [
           GoRoute(
             path: '/feed',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: FeedScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: FeedScreen()),
           ),
           GoRoute(
             path: '/events',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: EventsScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: EventsScreen()),
           ),
           GoRoute(
             path: '/messages',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: MessagesScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: MessagesScreen()),
           ),
           GoRoute(
             path: '/profile',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: ProfileScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ProfileScreen()),
           ),
         ],
       ),
@@ -146,4 +151,3 @@ class _ForgotPasswordScreen extends StatelessWidget {
     );
   }
 }
-

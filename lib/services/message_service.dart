@@ -7,7 +7,7 @@ class MessageService {
   final FirebaseFirestore _db;
 
   MessageService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   CollectionReference get _conversations => _db.collection('conversations');
 
@@ -16,7 +16,12 @@ class MessageService {
   // ══════════════════════════════════════════════════════════════════════════
 
   /// Get or create a conversation between two users
-  Future<String> getOrCreateConversation(String userId1, String userId2) async {
+  Future<String> getOrCreateConversation(
+    String userId1,
+    String userId2, {
+    String? user1Name,
+    String? user2Name,
+  }) async {
     // Sort IDs to ensure consistent conversation ID
     final participants = [userId1, userId2]..sort();
     final conversationId = '${participants[0]}_${participants[1]}';
@@ -25,9 +30,15 @@ class MessageService {
     if (!doc.exists) {
       await _conversations.doc(conversationId).set({
         'participants': participants,
+        'participantNames': {
+          userId1: user1Name ?? 'User',
+          userId2: user2Name ?? 'User',
+        },
         'createdAt': FieldValue.serverTimestamp(),
         'lastMessage': null,
         'lastMessageAt': null,
+        'typing': {},
+        'unreadCounts': {},
       });
     }
 
@@ -35,15 +46,18 @@ class MessageService {
   }
 
   /// Stream user's conversations
+  /// Note: Sorting is done client-side to avoid needing composite indexes
   Stream<QuerySnapshot> streamConversations(String userId) {
     return _conversations
         .where('participants', arrayContains: userId)
-        .orderBy('lastMessageAt', descending: true)
         .snapshots();
   }
 
   /// Stream messages in a conversation
-  Stream<QuerySnapshot> streamMessages(String conversationId, {int limit = 50}) {
+  Stream<QuerySnapshot> streamMessages(
+    String conversationId, {
+    int limit = 50,
+  }) {
     return _conversations
         .doc(conversationId)
         .collection('messages')
@@ -70,7 +84,10 @@ class MessageService {
     };
 
     // Add message to subcollection
-    await _conversations.doc(conversationId).collection('messages').add(messageData);
+    await _conversations
+        .doc(conversationId)
+        .collection('messages')
+        .add(messageData);
 
     // Update conversation's last message
     await _conversations.doc(conversationId).update({
@@ -85,22 +102,29 @@ class MessageService {
     final unreadMessages = await _conversations
         .doc(conversationId)
         .collection('messages')
-        .where('readBy', whereNotIn: [
-          [oderId]
-        ])
+        .where(
+          'readBy',
+          whereNotIn: [
+            [oderId],
+          ],
+        )
         .get();
 
     final batch = _db.batch();
     for (final doc in unreadMessages.docs) {
       batch.update(doc.reference, {
-        'readBy': FieldValue.arrayUnion([oderId])
+        'readBy': FieldValue.arrayUnion([oderId]),
       });
     }
     await batch.commit();
   }
 
   /// Set typing indicator
-  Future<void> setTyping(String conversationId, String oderId, bool isTyping) async {
+  Future<void> setTyping(
+    String conversationId,
+    String oderId,
+    bool isTyping,
+  ) async {
     await _conversations.doc(conversationId).update({
       'typing.$oderId': isTyping,
     });
@@ -120,26 +144,26 @@ class MessageService {
         .where('participants', arrayContains: oderId)
         .snapshots()
         .asyncMap((snapshot) async {
-      int total = 0;
-      for (final doc in snapshot.docs) {
-        final messages = await doc.reference
-            .collection('messages')
-            .where('senderId', isNotEqualTo: oderId)
-            .get();
+          int total = 0;
+          for (final doc in snapshot.docs) {
+            final messages = await doc.reference
+                .collection('messages')
+                .where('senderId', isNotEqualTo: oderId)
+                .get();
 
-        for (final msg in messages.docs) {
-          final readBy = List<String>.from(msg.data()['readBy'] ?? []);
-          if (!readBy.contains(oderId)) total++;
-        }
-      }
-      return total;
-    });
+            for (final msg in messages.docs) {
+              final readBy = List<String>.from(msg.data()['readBy'] ?? []);
+              if (!readBy.contains(oderId)) total++;
+            }
+          }
+          return total;
+        });
   }
 
   /// Delete a conversation (soft delete - just remove from user's view)
   Future<void> leaveConversation(String conversationId, String oderId) async {
     await _conversations.doc(conversationId).update({
-      'hiddenFor': FieldValue.arrayUnion([oderId])
+      'hiddenFor': FieldValue.arrayUnion([oderId]),
     });
   }
 }
@@ -148,4 +172,3 @@ class MessageService {
 final messageServiceProvider = Provider<MessageService>((ref) {
   return MessageService();
 });
-

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/animated_button.dart';
+import '../../../core/widgets/optimized_image.dart';
 import '../../../core/widgets/quad_avatar.dart';
 import '../../../core/widgets/quad_card.dart';
 import '../../../core/widgets/skeleton_loader.dart';
@@ -187,15 +188,20 @@ class FeedScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             TextField(
               controller: controller,
-              maxLines: 5,
+              maxLines: 6,
+              autofocus: true,
               decoration: InputDecoration(
                 hintText: "What's on your mind?",
+                hintStyle: TextStyle(color: AppColors.textTertiary),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
                 filled: true,
                 fillColor: AppColors.surfaceVariant,
+                contentPadding: const EdgeInsets.all(16),
               ),
+              style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 16),
             ElevatedButton(
@@ -290,11 +296,16 @@ class FeedScreen extends ConsumerWidget {
                   children: [
                     Text(
                       post.authorName,
-                      style: Theme.of(context).textTheme.titleSmall,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       timeago.format(post.createdAt),
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
                     ),
                   ],
                 ),
@@ -306,12 +317,23 @@ class FeedScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(post.content),
+          Text(
+            post.content,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              height: 1.5,
+            ),
+          ),
           if (post.hasImages) ...[
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(post.imageUrls.first, fit: BoxFit.cover),
+              child: OptimizedImage(
+                imageUrl: post.imageUrls.first,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: 300,
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ],
           const SizedBox(height: 16),
@@ -491,38 +513,80 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
           Expanded(
             child: comments.when(
               data: (list) => list.isEmpty
-                  ? const Center(child: Text('No comments yet'))
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.comment_outlined,
+                            size: 48,
+                            color: AppColors.textTertiary,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No comments yet',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Be the first to comment!',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
                   : ListView.builder(
                       itemCount: list.length,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       itemBuilder: (context, index) {
                         final comment = list[index];
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.only(bottom: 16),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               QuadAvatar(
-                                initials: comment.authorName[0],
-                                size: 32,
+                                initials: comment.authorName.isNotEmpty
+                                    ? comment.authorName[0].toUpperCase()
+                                    : '?',
+                                size: 36,
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      comment.authorName,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleSmall,
+                                    Row(
+                                      children: [
+                                        Text(
+                                          comment.authorName,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.titleSmall?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          timeago.format(comment.createdAt),
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall?.copyWith(
+                                            color: AppColors.textTertiary,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    Text(comment.content),
+                                    const SizedBox(height: 4),
                                     Text(
-                                      timeago.format(comment.createdAt),
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
+                                      comment.content,
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        height: 1.4,
+                                      ),
                                     ),
                                   ],
                                 ),

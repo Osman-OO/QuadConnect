@@ -76,7 +76,32 @@ class EventsScreen extends ConsumerWidget {
                     itemBuilder: (context, index) => const EventCardSkeleton(),
                   )
                 : eventsState.error != null
-                ? Center(child: Text('Error: ${eventsState.error}'))
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: AppColors.error,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error loading events',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            eventsState.error!,
+                            style: Theme.of(context).textTheme.bodySmall,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
                 : eventsState.filteredEvents.isEmpty
                 ? _buildEmptyState(context)
                 : RefreshIndicator(
@@ -105,21 +130,59 @@ class EventsScreen extends ConsumerWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.event_busy, size: 64, color: AppColors.textTertiary),
-          const SizedBox(height: 16),
-          Text(
-            'No events found',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try a different category or create one!',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primaryLight.withValues(alpha: 0.3),
+                    AppColors.secondaryLight.withValues(alpha: 0.3),
+                  ],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.calendar_today_outlined,
+                size: 64,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No upcoming events',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Be the first to create an event for your campus community!',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Consumer(
+              builder: (context, ref, _) => ElevatedButton.icon(
+                onPressed: () => _showCreateEventSheet(context, ref),
+                icon: const Icon(Icons.add),
+                label: const Text('Create First Event'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -229,35 +292,54 @@ class EventsScreen extends ConsumerWidget {
                     children: [
                       TextField(
                         controller: titleController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Event Title',
-                          border: OutlineInputBorder(),
+                          hintText: 'e.g., Campus Spring Festival',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: AppColors.surfaceVariant,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       TextField(
                         controller: descController,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
+                        maxLines: 4,
+                        decoration: InputDecoration(
                           labelText: 'Description',
-                          border: OutlineInputBorder(),
+                          hintText: 'Tell people about your event...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: AppColors.surfaceVariant,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       TextField(
                         controller: locationController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Location',
-                          prefixIcon: Icon(Icons.location_on),
-                          border: OutlineInputBorder(),
+                          hintText: 'e.g., Main Quad, Student Center',
+                          prefixIcon: const Icon(Icons.location_on),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: AppColors.surfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        initialValue: selectedCategory,
-                        decoration: const InputDecoration(
+                        value: selectedCategory,
+                        decoration: InputDecoration(
                           labelText: 'Category',
-                          border: OutlineInputBorder(),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: AppColors.surfaceVariant,
                         ),
                         items:
                             [

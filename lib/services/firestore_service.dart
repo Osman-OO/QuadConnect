@@ -7,7 +7,7 @@ class FirestoreService {
   final FirebaseFirestore _db;
 
   FirestoreService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   // Collection references - keeping these handy
   CollectionReference get users => _db.collection('users');
@@ -40,6 +40,49 @@ class FirestoreService {
     await users.doc(uid).update({'lastActive': FieldValue.serverTimestamp()});
   }
 
+  /// Find user by email address
+  Future<DocumentSnapshot?> findUserByEmail(String email) async {
+    final snapshot = await users
+        .where('email', isEqualTo: email.toLowerCase().trim())
+        .limit(1)
+        .get();
+    if (snapshot.docs.isNotEmpty) {
+      return snapshot.docs.first;
+    }
+    return null;
+  }
+
+  /// Search users by name or email (for finding people to message)
+  Future<List<DocumentSnapshot>> searchUsers(
+    String query, {
+    int limit = 10,
+  }) async {
+    final lowerQuery = query.toLowerCase().trim();
+    // Search by email (exact match)
+    final emailResults = await users
+        .where('email', isEqualTo: lowerQuery)
+        .limit(limit)
+        .get();
+
+    if (emailResults.docs.isNotEmpty) {
+      return emailResults.docs;
+    }
+
+    // If no email match, get all users and filter (simple approach for demo)
+    // In production, you'd use Algolia or similar for text search
+    final allUsers = await users.limit(50).get();
+    return allUsers.docs
+        .where((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          if (data == null) return false;
+          final name = (data['displayName'] as String?)?.toLowerCase() ?? '';
+          final email = (data['email'] as String?)?.toLowerCase() ?? '';
+          return name.contains(lowerQuery) || email.contains(lowerQuery);
+        })
+        .take(limit)
+        .toList();
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // POST OPERATIONS
   // ══════════════════════════════════════════════════════════════════════════
@@ -51,7 +94,10 @@ class FirestoreService {
   }
 
   /// Get feed posts with pagination
-  Stream<QuerySnapshot> streamFeed({int limit = 20, DocumentSnapshot? startAfter}) {
+  Stream<QuerySnapshot> streamFeed({
+    int limit = 20,
+    DocumentSnapshot? startAfter,
+  }) {
     Query query = posts.orderBy('createdAt', descending: true).limit(limit);
     if (startAfter != null) {
       query = query.startAfterDocument(startAfter);
@@ -69,8 +115,8 @@ class FirestoreService {
   }
 
   /// Like/unlike a post (toggle)
-  Future<void> toggleLike(String postId, String oderId, bool isLiked) async {
-    final likeRef = posts.doc(postId).collection('likes').doc(oderId);
+  Future<void> toggleLike(String postId, String userId, bool isLiked) async {
+    final likeRef = posts.doc(postId).collection('likes').doc(userId);
 
     if (isLiked) {
       await likeRef.delete();
@@ -132,34 +178,35 @@ class FirestoreService {
     return await events.add(data);
   }
 
-  /// Stream upcoming events
-  Stream<QuerySnapshot> streamUpcomingEvents({String? category, int limit = 20}) {
-    Query query = events
-        .where('startTime', isGreaterThan: Timestamp.now())
-        .orderBy('startTime')
-        .limit(limit);
-
-    if (category != null && category != 'all') {
-      query = events
-          .where('category', isEqualTo: category)
-          .where('startTime', isGreaterThan: Timestamp.now())
-          .orderBy('startTime')
-          .limit(limit);
-    }
-
-    return query.snapshots();
+  /// Stream all events (no composite index needed)
+  /// Filtering is done client-side to avoid Firestore index requirements
+  Stream<QuerySnapshot> streamUpcomingEvents({
+    String? category,
+    int limit = 50,
+  }) {
+    // Simple query without composite index requirement
+    // Sort and filter client-side in the provider
+    return events.limit(limit).snapshots();
   }
 
   /// RSVP to an event
-  Future<void> rsvpEvent(String eventId, String oderId, bool isAttending) async {
-    final rsvpRef = events.doc(eventId).collection('attendees').doc(oderId);
+  Future<void> rsvpEvent(
+    String eventId,
+    String userId,
+    bool isAttending,
+  ) async {
+    final rsvpRef = events.doc(eventId).collection('attendees').doc(userId);
 
     if (isAttending) {
       await rsvpRef.delete();
-      await events.doc(eventId).update({'attendeesCount': FieldValue.increment(-1)});
+      await events.doc(eventId).update({
+        'attendeesCount': FieldValue.increment(-1),
+      });
     } else {
       await rsvpRef.set({'rsvpAt': FieldValue.serverTimestamp()});
-      await events.doc(eventId).update({'attendeesCount': FieldValue.increment(1)});
+      await events.doc(eventId).update({
+        'attendeesCount': FieldValue.increment(1),
+      });
     }
   }
 
@@ -183,4 +230,3 @@ class FirestoreService {
 final firestoreServiceProvider = Provider<FirestoreService>((ref) {
   return FirestoreService();
 });
-

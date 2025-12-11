@@ -55,9 +55,10 @@ class AuthService {
       await credential.user!.updateDisplayName(displayName);
 
       // Create user document in Firestore
+      // Store email in lowercase for consistent lookups
       final userModel = UserModel(
         uid: credential.user!.uid,
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         displayName: displayName,
         createdAt: DateTime.now(),
       );

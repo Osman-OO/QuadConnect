@@ -1,25 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
+import 'core/utils/performance_utils.dart';
 import 'router/app_router.dart';
 
 void main() async {
+  final stopwatch = Stopwatch()..start();
+
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // Set preferred orientations
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
+  // Run initialization in parallel for faster startup
+  await Future.wait([
+    // Initialize Firebase
+    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
+    // Set preferred orientations
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]),
   ]);
 
-  // Set system UI overlay style
+  // Configure image cache for optimal performance
+  PerformanceUtils.configureImageCache();
+
+  // Set system UI overlay style (non-async, so separate)
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -28,6 +37,11 @@ void main() async {
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
+
+  stopwatch.stop();
+  if (kDebugMode) {
+    debugPrint('🚀 App initialized in ${stopwatch.elapsedMilliseconds}ms');
+  }
 
   runApp(const ProviderScope(child: QuadConnectApp()));
 }

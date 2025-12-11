@@ -48,9 +48,16 @@ class MessagesNotifier extends Notifier<MessagesState> {
         .streamConversations(authState.user!.uid)
         .listen(
           (snapshot) {
-            final conversations = snapshot.docs
-                .map((doc) => ConversationModel.fromFirestore(doc))
-                .toList();
+            final conversations =
+                snapshot.docs
+                    .map((doc) => ConversationModel.fromFirestore(doc))
+                    .toList()
+                  // Sort client-side to avoid composite index requirement
+                  ..sort((a, b) {
+                    final aTime = a.lastMessageAt ?? a.createdAt;
+                    final bTime = b.lastMessageAt ?? b.createdAt;
+                    return bTime.compareTo(aTime); // Descending
+                  });
             state = state.copyWith(
               conversations: conversations,
               isLoading: false,
@@ -63,13 +70,19 @@ class MessagesNotifier extends Notifier<MessagesState> {
   }
 
   /// Start a new conversation with a user
-  Future<String> startConversation(String otherUserId) async {
+  Future<String> startConversation(
+    String otherUserId, {
+    String? otherUserName,
+  }) async {
     final authState = ref.read(authNotifierProvider);
     if (authState.user == null) throw Exception('Not authenticated');
 
+    final currentUser = authState.user!;
     return await _messageService.getOrCreateConversation(
-      authState.user!.uid,
+      currentUser.uid,
       otherUserId,
+      user1Name: currentUser.displayName,
+      user2Name: otherUserName,
     );
   }
 
