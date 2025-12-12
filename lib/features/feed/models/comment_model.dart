@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+
 /// A comment on a post
 class CommentModel {
   final String id;

@@ -52,17 +52,13 @@ class FeedScreen extends ConsumerWidget {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          // Refresh happens automatically via stream
           await Future.delayed(const Duration(milliseconds: 500));
         },
         child: CustomScrollView(
           slivers: [
-            // Create post prompt
             SliverToBoxAdapter(
               child: _buildCreatePostCard(context, ref, authState),
             ),
-
-            // Loading state with skeleton
             if (feedState.isLoading)
               SliverList(
                 delegate: SliverChildBuilderDelegate(
@@ -70,71 +66,43 @@ class FeedScreen extends ConsumerWidget {
                   childCount: 5,
                 ),
               )
-            // Error state
             else if (feedState.error != null)
               SliverFillRemaining(
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: AppColors.error,
-                      ),
+                      Icon(Icons.error_outline, size: 48, color: AppColors.error),
                       const SizedBox(height: 16),
-                      Text(
-                        'Error loading feed',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
+                      Text('Error loading feed', style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
-                      Text(
-                        feedState.error!,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+                      Text(feedState.error!, style: Theme.of(context).textTheme.bodySmall),
                     ],
                   ),
                 ),
               )
-            // Empty state
             else if (feedState.posts.isEmpty)
               SliverFillRemaining(
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.article_outlined,
-                        size: 64,
-                        color: AppColors.textTertiary,
-                      ),
+                      Icon(Icons.article_outlined, size: 64, color: AppColors.textTertiary),
                       const SizedBox(height: 16),
-                      Text(
-                        'No posts yet',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
+                      Text('No posts yet', style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
-                      Text(
-                        'Be the first to share something!',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+                      Text('Be the first to share something!', style: Theme.of(context).textTheme.bodySmall),
                     ],
                   ),
                 ),
               )
-            // Posts list (using filtered posts)
             else
               SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) => _buildPostCard(
-                    context,
-                    ref,
-                    feedState.filteredPosts[index],
-                  ),
+                  (context, index) => _buildPostCard(context, ref, feedState.filteredPosts[index]),
                   childCount: feedState.filteredPosts.length,
                 ),
               ),
-
             const SliverToBoxAdapter(child: SizedBox(height: 80)),
           ],
         ),
@@ -150,7 +118,6 @@ class FeedScreen extends ConsumerWidget {
     showSearch(context: context, delegate: PostSearchDelegate());
   }
 
-  /// Show bottom sheet for creating a new post
   void _showCreatePostSheet(BuildContext context, WidgetRef ref) {
     final controller = TextEditingController();
     showModalBottomSheet(
@@ -175,14 +142,8 @@ class FeedScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Create Post',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
+                Text('Create Post', style: Theme.of(context).textTheme.titleLarge),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
               ],
             ),
             const SizedBox(height: 16),
@@ -207,17 +168,13 @@ class FeedScreen extends ConsumerWidget {
             ElevatedButton(
               onPressed: () async {
                 if (controller.text.trim().isNotEmpty) {
-                  await ref
-                      .read(feedProvider.notifier)
-                      .createPost(content: controller.text.trim());
+                  await ref.read(feedProvider.notifier).createPost(content: controller.text.trim());
                   if (context.mounted) Navigator.pop(context);
                 }
               },
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Post'),
             ),
@@ -228,11 +185,7 @@ class FeedScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCreatePostCard(
-    BuildContext context,
-    WidgetRef ref,
-    AuthState authState,
-  ) {
+  Widget _buildCreatePostCard(BuildContext context, WidgetRef ref, AuthState authState) {
     return GestureDetector(
       onTap: () => _showCreatePostSheet(context, ref),
       child: QuadCard(
@@ -247,19 +200,14 @@ class FeedScreen extends ConsumerWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceVariant,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Text(
                   "What's on your mind?",
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary),
                 ),
               ),
             ),
@@ -279,14 +227,11 @@ class FeedScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Author row
           Row(
             children: [
               QuadAvatar(
                 imageUrl: post.authorPhotoUrl,
-                initials: post.authorName.isNotEmpty
-                    ? post.authorName[0].toUpperCase()
-                    : '?',
+                initials: post.authorName.isNotEmpty ? post.authorName[0].toUpperCase() : '?',
                 size: 44,
               ),
               const SizedBox(width: 12),
@@ -294,35 +239,17 @@ class FeedScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      post.authorName,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Text(post.authorName, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
-                    Text(
-                      timeago.format(post.createdAt),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
+                    Text(timeago.format(post.createdAt), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
                   ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.more_horiz),
-                onPressed: () => _showPostOptions(context, ref, post),
-              ),
+              IconButton(icon: const Icon(Icons.more_horiz), onPressed: () => _showPostOptions(context, ref, post)),
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            post.content,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              height: 1.5,
-            ),
-          ),
+          Text(post.content, style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5)),
           if (post.hasImages) ...[
             const SizedBox(height: 12),
             ClipRRect(
@@ -337,7 +264,6 @@ class FeedScreen extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 16),
-          // Actions row with real-time like status
           _PostActions(post: post),
         ],
       ),
@@ -363,16 +289,8 @@ class FeedScreen extends ConsumerWidget {
                   await ref.read(feedProvider.notifier).deletePost(post.id);
                 },
               ),
-            ListTile(
-              leading: const Icon(Icons.share),
-              title: const Text('Share'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.flag_outlined),
-              title: const Text('Report'),
-              onTap: () => Navigator.pop(context),
-            ),
+            ListTile(leading: const Icon(Icons.share), title: const Text('Share'), onTap: () => Navigator.pop(context)),
+            ListTile(leading: const Icon(Icons.flag_outlined), title: const Text('Report'), onTap: () => Navigator.pop(context)),
           ],
         ),
       ),
@@ -380,7 +298,7 @@ class FeedScreen extends ConsumerWidget {
   }
 }
 
-/// Separate widget for post actions to handle like state
+/// Widget for post actions (likes, comments, save)
 class _PostActions extends ConsumerWidget {
   final PostModel post;
   const _PostActions({required this.post});
@@ -392,45 +310,24 @@ class _PostActions extends ConsumerWidget {
 
     return Row(
       children: [
-        // Animated like button
         GestureDetector(
           onTap: () => ref.read(feedProvider.notifier).toggleLike(post.id),
           child: Row(
             children: [
-              AnimatedLikeButton(
-                isLiked: isLiked,
-                onTap: () =>
-                    ref.read(feedProvider.notifier).toggleLike(post.id),
-                size: 20,
-              ),
+              AnimatedLikeButton(isLiked: isLiked, onTap: () => ref.read(feedProvider.notifier).toggleLike(post.id), size: 20),
               const SizedBox(width: 4),
-              Text(
-                '${post.likesCount}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: isLiked
-                      ? AppColors.secondary
-                      : AppColors.textSecondary,
-                ),
-              ),
+              Text('${post.likesCount}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: isLiked ? AppColors.secondary : AppColors.textSecondary)),
             ],
           ),
         ),
         const SizedBox(width: 24),
-        _buildActionButton(
-          context,
-          Icons.chat_bubble_outline,
-          '${post.commentsCount}',
-          AppColors.primary,
-          () => _showComments(context, ref),
-        ),
+        _buildActionButton(context, Icons.chat_bubble_outline, '${post.commentsCount}', AppColors.primary, () => _showComments(context, ref)),
         const SizedBox(width: 24),
-        _buildActionButton(
-          context,
-          Icons.share_outlined,
-          'Share',
-          AppColors.textSecondary,
-          () {},
-        ),
+        _buildActionButton(context, Icons.share_outlined, 'Share', AppColors.textSecondary, () {}),
+        const SizedBox(width: 24),
+        _buildActionButton(context, post.isSaved ? Icons.bookmark : Icons.bookmark_border, 'Save', post.isSaved ? AppColors.secondary : AppColors.textSecondary, () {
+          ref.read(feedProvider.notifier).toggleSave(post.id);
+        }),
       ],
     );
   }
@@ -444,13 +341,7 @@ class _PostActions extends ConsumerWidget {
     );
   }
 
-  Widget _buildActionButton(
-    BuildContext context,
-    IconData icon,
-    String label,
-    Color color,
-    VoidCallback onTap,
-  ) {
+  Widget _buildActionButton(BuildContext context, IconData icon, String label, Color color, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -460,12 +351,7 @@ class _PostActions extends ConsumerWidget {
           children: [
             Icon(icon, size: 20, color: color),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-            ),
+            Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
           ],
         ),
       ),
@@ -503,10 +389,7 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Comments', style: Theme.of(context).textTheme.titleLarge),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
               ],
             ),
           ),
@@ -517,25 +400,11 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.comment_outlined,
-                            size: 48,
-                            color: AppColors.textTertiary,
-                          ),
+                          Icon(Icons.comment_outlined, size: 48, color: AppColors.textTertiary),
                           const SizedBox(height: 12),
-                          Text(
-                            'No comments yet',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
+                          Text('No comments yet', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.textSecondary)),
                           const SizedBox(height: 4),
-                          Text(
-                            'Be the first to comment!',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textTertiary,
-                            ),
-                          ),
+                          Text('Be the first to comment!', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
                         ],
                       ),
                     )
@@ -550,9 +419,7 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               QuadAvatar(
-                                initials: comment.authorName.isNotEmpty
-                                    ? comment.authorName[0].toUpperCase()
-                                    : '?',
+                                initials: comment.authorName.isNotEmpty ? comment.authorName[0].toUpperCase() : '?',
                                 size: 36,
                               ),
                               const SizedBox(width: 12),
@@ -562,32 +429,13 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                                   children: [
                                     Row(
                                       children: [
-                                        Text(
-                                          comment.authorName,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.titleSmall?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
+                                        Text(comment.authorName, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                                         const SizedBox(width: 8),
-                                        Text(
-                                          timeago.format(comment.createdAt),
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.bodySmall?.copyWith(
-                                            color: AppColors.textTertiary,
-                                          ),
-                                        ),
+                                        Text(timeago.format(comment.createdAt), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary)),
                                       ],
                                     ),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      comment.content,
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        height: 1.4,
-                                      ),
-                                    ),
+                                    Text(comment.content, style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4)),
                                   ],
                                 ),
                               ),
@@ -601,11 +449,7 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
             ),
           ),
           Padding(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-            ),
+            padding: EdgeInsets.only(left: 16, right: 16, bottom: MediaQuery.of(context).viewInsets.bottom + 16),
             child: Row(
               children: [
                 Expanded(
@@ -613,13 +457,8 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                     controller: _controller,
                     decoration: InputDecoration(
                       hintText: 'Write a comment...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                 ),
@@ -628,10 +467,7 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                   icon: const Icon(Icons.send, color: AppColors.primary),
                   onPressed: () async {
                     if (_controller.text.trim().isNotEmpty) {
-                      await ref.read(addCommentProvider)(
-                        widget.postId,
-                        _controller.text.trim(),
-                      );
+                      await ref.read(addCommentProvider)(widget.postId, _controller.text.trim());
                       _controller.clear();
                     }
                   },
@@ -645,22 +481,18 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
   }
 }
 
-/// Search delegate for posts with real-time filtering
+/// Search delegate for posts
 class PostSearchDelegate extends SearchDelegate<String> {
   @override
   String get searchFieldLabel => 'Search posts, people, topics...';
 
   @override
   List<Widget> buildActions(BuildContext context) => [
-    if (query.isNotEmpty)
-      IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
-  ];
+        if (query.isNotEmpty) IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
+      ];
 
   @override
-  Widget buildLeading(BuildContext context) => IconButton(
-    icon: const Icon(Icons.arrow_back),
-    onPressed: () => close(context, ''),
-  );
+  Widget buildLeading(BuildContext context) => IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => close(context, ''));
 
   @override
   Widget buildResults(BuildContext context) => _SearchResults(query: query);
@@ -669,7 +501,6 @@ class PostSearchDelegate extends SearchDelegate<String> {
   Widget buildSuggestions(BuildContext context) => _SearchResults(query: query);
 }
 
-/// Search results widget
 class _SearchResults extends ConsumerWidget {
   final String query;
   const _SearchResults({required this.query});
@@ -683,12 +514,7 @@ class _SearchResults extends ConsumerWidget {
           children: [
             Icon(Icons.search, size: 64, color: AppColors.textTertiary),
             const SizedBox(height: 16),
-            Text(
-              'Search for posts, people, or topics',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary),
-            ),
+            Text('Search for posts, people, or topics', style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary)),
           ],
         ),
       );
@@ -704,25 +530,26 @@ class _SearchResults extends ConsumerWidget {
     }).toList();
 
     if (results.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.search_off, size: 64, color: AppColors.textTertiary),
-            const SizedBox(height: 16),
-            Text(
-              'No results for "$query"',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try different keywords',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
+  return Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.search_off, size: 64, color: AppColors.textTertiary),
+        const SizedBox(height: 16),
+        Text(
+          'No results for "$query"',
+          style: Theme.of(context).textTheme.titleMedium,
         ),
-      );
-    }
+        const SizedBox(height: 8),
+        Text(
+          'Try different keywords',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    ),
+  );
+}
+
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -734,9 +561,7 @@ class _SearchResults extends ConsumerWidget {
           child: ListTile(
             leading: QuadAvatar(
               imageUrl: post.authorPhotoUrl,
-              initials: post.authorName.isNotEmpty
-                  ? post.authorName[0].toUpperCase()
-                  : '?',
+              initials: post.authorName.isNotEmpty ? post.authorName[0].toUpperCase() : '?',
               size: 40,
             ),
             title: Text(post.authorName),
@@ -749,6 +574,9 @@ class _SearchResults extends ConsumerWidget {
               timeago.format(post.createdAt),
               style: Theme.of(context).textTheme.labelSmall,
             ),
+            onTap: () {
+              // Optionally, navigate to post details
+            },
           ),
         );
       },

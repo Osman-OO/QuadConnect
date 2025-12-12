@@ -1,17 +1,15 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../services/firestore_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/post_model.dart';
 import '../models/comment_model.dart';
 
-/// State for the feed
 class FeedState {
   final List<PostModel> posts;
   final bool isLoading;
   final bool hasMore;
   final String? error;
-  final DocumentSnapshot? lastDocument;
+  final String? lastPostId; // replaced DocumentSnapshot
   final String searchQuery;
   final String? selectedCategory;
 
@@ -20,40 +18,37 @@ class FeedState {
     this.isLoading = false,
     this.hasMore = true,
     this.error,
-    this.lastDocument,
+    this.lastPostId,
     this.searchQuery = '',
     this.selectedCategory,
   });
 
-  /// Get filtered posts based on search and category
   List<PostModel> get filteredPosts {
     var filtered = posts;
 
-    // Filter by search query
     if (searchQuery.isNotEmpty) {
       final query = searchQuery.toLowerCase();
-      filtered = filtered.where((post) {
-        return post.content.toLowerCase().contains(query) ||
-            post.authorName.toLowerCase().contains(query);
-      }).toList();
+      filtered = filtered.where((p) =>
+          p.content.toLowerCase().contains(query) ||
+          p.authorName.toLowerCase().contains(query)).toList();
     }
 
-    // Filter by tag/category
     if (selectedCategory != null) {
-      filtered = filtered
-          .where((post) => post.tags.contains(selectedCategory))
-          .toList();
+      filtered = filtered.where((p) => p.tags.contains(selectedCategory)).toList();
     }
 
     return filtered;
   }
+
+  List<PostModel> get savedPosts =>
+      posts.where((p) => p.isSaved).toList();
 
   FeedState copyWith({
     List<PostModel>? posts,
     bool? isLoading,
     bool? hasMore,
     String? error,
-    DocumentSnapshot? lastDocument,
+    String? lastPostId,
     String? searchQuery,
     String? selectedCategory,
     bool clearCategory = false,
@@ -63,39 +58,28 @@ class FeedState {
       isLoading: isLoading ?? this.isLoading,
       hasMore: hasMore ?? this.hasMore,
       error: error,
-      lastDocument: lastDocument ?? this.lastDocument,
+      lastPostId: lastPostId ?? this.lastPostId,
       searchQuery: searchQuery ?? this.searchQuery,
-      selectedCategory: clearCategory
-          ? null
-          : (selectedCategory ?? this.selectedCategory),
+      selectedCategory: clearCategory ? null : (selectedCategory ?? this.selectedCategory),
     );
   }
 }
 
-/// Manages the feed state and operations
 class FeedNotifier extends Notifier<FeedState> {
   late FirestoreService _firestoreService;
 
   @override
   FeedState build() {
     _firestoreService = ref.watch(firestoreServiceProvider);
-    // Start listening to feed when provider is created
     _subscribeToFeed();
     return const FeedState(isLoading: true);
   }
 
   void _subscribeToFeed() {
     _firestoreService.streamFeed().listen(
-      (snapshot) {
-        final posts = snapshot.docs
-            .map((doc) => PostModel.fromFirestore(doc))
-            .toList();
-        state = state.copyWith(
-          posts: posts,
-          isLoading: false,
-          hasMore: posts.length >= 20,
-          lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
-        );
+      (posts) {
+        final lastId = posts.isNotEmpty ? posts.last.id : null;
+        state = state.copyWith(posts: posts, isLoading: false, hasMore: posts.length >= 20, lastPostId: lastId);
       },
       onError: (error) {
         state = state.copyWith(isLoading: false, error: error.toString());
@@ -103,32 +87,11 @@ class FeedNotifier extends Notifier<FeedState> {
     );
   }
 
-  /// Set search query for filtering posts
-  void setSearchQuery(String query) {
-    state = state.copyWith(searchQuery: query);
-  }
+  void setSearchQuery(String query) => state = state.copyWith(searchQuery: query);
+  void setCategory(String? category) => state = state.copyWith(selectedCategory: category);
+  void clearFilters() => state = state.copyWith(searchQuery: '', clearCategory: true);
 
-  /// Set category filter
-  void setCategory(String? category) {
-    if (category == null) {
-      state = state.copyWith(clearCategory: true);
-    } else {
-      state = state.copyWith(selectedCategory: category);
-    }
-  }
-
-  /// Clear all filters
-  void clearFilters() {
-    state = state.copyWith(searchQuery: '', clearCategory: true);
-  }
-
-  /// Create a new post
-  Future<void> createPost({
-    required String content,
-    List<String> imageUrls = const [],
-    List<String> tags = const [],
-    PostType type = PostType.text,
-  }) async {
+  Future<void> createPost({required String content, List<String> imageUrls = const [], List<String> tags = const [], PostType type = PostType.text}) async {
     final authState = ref.read(authNotifierProvider);
     if (authState.user == null) return;
 
@@ -146,70 +109,59 @@ class FeedNotifier extends Notifier<FeedState> {
         'commentsCount': 0,
         'sharesCount': 0,
         'isPinned': false,
+        'savedBy': [],
       });
     } catch (e) {
       state = state.copyWith(error: 'Failed to create post: $e');
     }
   }
 
-  /// Toggle like on a post
   Future<void> toggleLike(String postId) async {
     final authState = ref.read(authNotifierProvider);
     if (authState.user == null) return;
-
     final userId = authState.user!.uid;
     final isLiked = await _firestoreService.hasLiked(postId, userId);
     await _firestoreService.toggleLike(postId, userId, isLiked);
   }
 
-  /// Delete a post
-  Future<void> deletePost(String postId) async {
-    await _firestoreService.deletePost(postId);
+  Future<void> toggleSave(String postId) async {
+    final authState = ref.read(authNotifierProvider);
+    if (authState.user == null) return;
+
+    final postIndex = state.posts.indexWhere((p) => p.id == postId);
+    if (postIndex == -1) return;
+
+    final post = state.posts[postIndex];
+    final isSaved = post.isSaved;
+    await _firestoreService.toggleSave(postId, authState.user!.uid, isSaved);
+
+    final updatedPosts = [...state.posts];
+    updatedPosts[postIndex] = post.copyWith(isSaved: !isSaved);
+    state = state.copyWith(posts: updatedPosts);
   }
+
+  Future<void> deletePost(String postId) async => _firestoreService.deletePost(postId);
 }
 
-/// Provider for feed
-final feedProvider = NotifierProvider<FeedNotifier, FeedState>(() {
-  return FeedNotifier();
-});
+final feedProvider = NotifierProvider<FeedNotifier, FeedState>(() => FeedNotifier());
 
-/// Stream provider for checking if user liked a specific post
-final postLikeStatusProvider = StreamProvider.family<bool, String>((
-  ref,
-  postId,
-) {
+final postLikeStatusProvider = StreamProvider.family<bool, String>((ref, postId) {
   final authState = ref.watch(authNotifierProvider);
   if (authState.user == null) return Stream.value(false);
-
-  final firestoreService = ref.watch(firestoreServiceProvider);
-  return firestoreService.streamLikeStatus(postId, authState.user!.uid);
+  return ref.watch(firestoreServiceProvider).streamLikeStatus(postId, authState.user!.uid);
 });
 
-/// Stream provider for post comments
-final postCommentsProvider = StreamProvider.family<List<CommentModel>, String>((
-  ref,
-  postId,
-) {
-  final firestoreService = ref.watch(firestoreServiceProvider);
-  return firestoreService
-      .streamComments(postId)
-      .map(
-        (snapshot) => snapshot.docs
-            .map((doc) => CommentModel.fromFirestore(doc))
-            .toList(),
-      );
+final postCommentsProvider = StreamProvider.family<List<CommentModel>, String>((ref, postId) {
+  return ref.watch(firestoreServiceProvider).streamComments(postId).map((snapshot) =>
+      snapshot.docs.map((doc) => CommentModel.fromFirestore(doc)).toList());
 });
 
-/// Add a comment
 final addCommentProvider = Provider((ref) {
   return (String postId, String content) async {
     final authState = ref.read(authNotifierProvider);
     if (authState.user == null) return;
-
     final user = authState.user!;
-    final firestoreService = ref.read(firestoreServiceProvider);
-
-    await firestoreService.addComment(postId, {
+    await ref.read(firestoreServiceProvider).addComment(postId, {
       'authorId': user.uid,
       'authorName': user.displayName,
       'authorPhotoUrl': user.photoUrl,

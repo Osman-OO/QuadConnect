@@ -8,7 +8,7 @@ import '../models/event_model.dart';
 /// State for events list
 class EventsState {
   final List<EventModel> events;
-  final String? selectedCategory; // null means "all"
+  final String? selectedCategory; // null = all
   final bool isLoading;
   final String? error;
 
@@ -36,14 +36,12 @@ class EventsState {
     );
   }
 
-  /// Filter events by selected category
+  /// Filter events by category
   List<EventModel> get filteredEvents {
     if (selectedCategory == null) return events;
     return events
-        .where(
-          (e) =>
-              e.category.name.toLowerCase() == selectedCategory!.toLowerCase(),
-        )
+        .where((e) =>
+            e.category.name.toLowerCase() == selectedCategory!.toLowerCase())
         .toList();
   }
 }
@@ -60,26 +58,26 @@ class EventsNotifier extends Notifier<EventsState> {
   }
 
   void _subscribeToEvents() {
-    _firestoreService.streamUpcomingEvents().listen(
-      (snapshot) {
-        final now = DateTime.now();
-        final events =
-            snapshot.docs
-                .map((doc) => EventModel.fromFirestore(doc))
-                // Filter to upcoming events only (client-side)
-                .where((e) => e.startTime.isAfter(now))
-                .toList()
-              // Sort by start time (client-side)
-              ..sort((a, b) => a.startTime.compareTo(b.startTime));
-        state = state.copyWith(events: events, isLoading: false);
-      },
-      onError: (error) {
-        state = state.copyWith(isLoading: false, error: error.toString());
-      },
-    );
-  }
+  final selectedCategory = state.selectedCategory;
 
-  /// Change category filter (null = all)
+  _firestoreService.streamUpcomingEvents(category: selectedCategory).listen(
+    (events) {
+      final now = DateTime.now();
+      final upcomingEvents = events
+          .where((e) => e.startTime.isAfter(now))
+          .toList()
+        ..sort((a, b) => a.startTime.compareTo(b.startTime));
+
+      state = state.copyWith(events: upcomingEvents, isLoading: false);
+    },
+    onError: (error) {
+      state = state.copyWith(isLoading: false, error: error.toString());
+    },
+  );
+}
+
+
+  /// Set category filter
   void setCategory(String? category) {
     if (category == null) {
       state = state.copyWith(clearCategory: true);
@@ -126,45 +124,29 @@ class EventsNotifier extends Notifier<EventsState> {
     }
   }
 
-  /// Toggle RSVP for an event (with capacity check)
+  /// Toggle RSVP for an event
   Future<bool> toggleRsvp(String eventId) async {
     final authState = ref.read(authNotifierProvider);
     if (authState.user == null) return false;
 
     final userId = authState.user!.uid;
 
-    // Check current status
-    final attendeeDoc = await _firestoreService.events
+    // Check current RSVP status
+    final rsvpSnapshot = await _firestoreService.events
         .doc(eventId)
-        .collection('attendees')
+        .collection('rsvps')
         .doc(userId)
         .get();
 
-    // If already attending, just remove
-    if (attendeeDoc.exists) {
-      await _firestoreService.rsvpEvent(eventId, userId, true);
-      return true;
-    }
+    final isAttending = rsvpSnapshot.exists;
 
-    // Check capacity before adding
-    final eventDoc = await _firestoreService.events.doc(eventId).get();
-    final eventData = eventDoc.data() as Map<String, dynamic>?;
-    if (eventData != null) {
-      final maxAttendees = eventData['maxAttendees'] ?? 0;
-      final currentAttendees = eventData['attendeesCount'] ?? 0;
+    // Toggle RSVP
+    await _firestoreService.rsvpEvent(eventId, userId, !isAttending);
 
-      // If capacity is set and full, don't allow RSVP
-      if (maxAttendees > 0 && currentAttendees >= maxAttendees) {
-        state = state.copyWith(error: 'This event is at capacity');
-        return false;
-      }
-    }
-
-    await _firestoreService.rsvpEvent(eventId, userId, false);
-    return true;
+    return !isAttending;
   }
 
-  /// Delete an event (only organizer can delete)
+  /// Delete an event
   Future<void> deleteEvent(String eventId) async {
     final authState = ref.read(authNotifierProvider);
     if (authState.user == null) return;
@@ -198,18 +180,17 @@ final eventsProvider = NotifierProvider<EventsNotifier, EventsState>(() {
 });
 
 /// Stream provider for RSVP status
-final eventRsvpStatusProvider = StreamProvider.family<bool, String>((
-  ref,
-  eventId,
-) {
-  final authState = ref.watch(authNotifierProvider);
-  if (authState.user == null) return Stream.value(false);
+final eventRsvpStatusProvider = StreamProvider.family<bool, String>(
+  (ref, eventId) {
+    final authState = ref.watch(authNotifierProvider);
+    if (authState.user == null) return Stream.value(false);
 
-  final firestoreService = ref.watch(firestoreServiceProvider);
-  return firestoreService.streamRsvpStatus(eventId, authState.user!.uid);
-});
+    final firestoreService = ref.watch(firestoreServiceProvider);
+    return firestoreService.streamRsvpStatus(eventId, authState.user!.uid);
+  },
+);
 
-/// Available event categories for filtering
+/// Event categories for filtering
 final eventCategoriesProvider = Provider<List<Map<String, dynamic>>>((ref) {
   return [
     {'name': 'Academic', 'icon': Icons.school},

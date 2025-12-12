@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/quad_avatar.dart';
 import '../../../core/widgets/quad_button.dart';
 import '../../auth/providers/auth_provider.dart';
+
+import '../../feed/models/post_model.dart';
+import '../../feed/providers/feed_provider.dart';
+import '../../feed/screens/saved_posts_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -30,18 +35,10 @@ class ProfileScreen extends ConsumerWidget {
         child: Column(
           children: [
             const SizedBox(height: 20),
-
-            // Profile header
             _buildProfileHeader(context, user),
-
             const SizedBox(height: 32),
-
-            // Stats row
             _buildStatsRow(context, user),
-
             const SizedBox(height: 24),
-
-            // Action buttons
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -51,9 +48,7 @@ class ProfileScreen extends ConsumerWidget {
                       label: 'Edit Profile',
                       variant: QuadButtonVariant.outline,
                       height: 44,
-                      onPressed: () {
-                        // TODO: Edit profile
-                      },
+                      onPressed: () {},
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -62,23 +57,15 @@ class ProfileScreen extends ConsumerWidget {
                       label: 'Share Profile',
                       variant: QuadButtonVariant.outline,
                       height: 44,
-                      onPressed: () {
-                        // TODO: Share profile
-                      },
+                      onPressed: () {},
                     ),
                   ),
                 ],
               ),
             ),
-
             const SizedBox(height: 32),
-
-            // Menu options
             _buildMenuSection(context, ref),
-
             const SizedBox(height: 24),
-
-            // Sign out button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: QuadButton(
@@ -90,7 +77,8 @@ class ProfileScreen extends ConsumerWidget {
                     context: context,
                     builder: (context) => AlertDialog(
                       title: const Text('Sign Out'),
-                      content: const Text('Are you sure you want to sign out?'),
+                      content:
+                          const Text('Are you sure you want to sign out?'),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),
@@ -103,17 +91,13 @@ class ProfileScreen extends ConsumerWidget {
                       ],
                     ),
                   );
-
                   if (confirmed == true) {
                     await ref.read(authNotifierProvider.notifier).signOut();
-                    if (context.mounted) {
-                      context.go('/login');
-                    }
+                    if (context.mounted) context.go('/login');
                   }
                 },
               ),
             ),
-
             const SizedBox(height: 40),
           ],
         ),
@@ -128,23 +112,23 @@ class ProfileScreen extends ConsumerWidget {
           imageUrl: user?.photoUrl,
           initials: user?.initials ?? '?',
           isEditable: true,
-          onTap: () {
-            // TODO: Change photo
-          },
+          onTap: () {},
         ),
         const SizedBox(height: 16),
         Text(
           user?.displayName ?? 'Student',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(context)
+              .textTheme
+              .headlineSmall
+              ?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
         Text(
           user?.email ?? '',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: AppColors.textSecondary),
         ),
         if (user?.major != null) ...[
           const SizedBox(height: 8),
@@ -156,9 +140,10 @@ class ProfileScreen extends ConsumerWidget {
             ),
             child: Text(
               user!.major!,
-              style: Theme.of(
-                context,
-              ).textTheme.labelMedium?.copyWith(color: AppColors.primary),
+              style: Theme.of(context)
+                  .textTheme
+                  .labelMedium
+                  ?.copyWith(color: AppColors.primary),
             ),
           ),
         ],
@@ -169,12 +154,10 @@ class ProfileScreen extends ConsumerWidget {
             child: Text(
               user.bio!,
               textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-                height: 1.5,
-              ),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppColors.textSecondary, height: 1.5),
             ),
           ),
         ],
@@ -197,23 +180,23 @@ class ProfileScreen extends ConsumerWidget {
 
   Widget _buildStatItem(BuildContext context, String value, String label) {
     return GestureDetector(
-      onTap: () {
-        // TODO: Navigate to list
-      },
+      onTap: () {},
       child: Column(
         children: [
           Text(
             value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -225,43 +208,57 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildMenuSection(BuildContext context, WidgetRef ref) {
+    final feedState = ref.watch(feedProvider);
+
     return Column(
       children: [
         _buildMenuItem(
           context,
           Icons.bookmark_outline,
           'Saved Posts',
-          onTap: () {},
+          onTap: () {
+            final savedPosts =
+                feedState.posts.where((post) => post.isSaved).toList();
+            if (savedPosts.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('No saved posts yet')),
+              );
+            } else {
+              context.push('/profile/saved-posts', extra: savedPosts);
+            }
+          },
         ),
         _buildMenuItem(
           context,
           Icons.event_outlined,
           'My Events',
-          onTap: () {},
+          onTap: () => context.push('/my-events'),
         ),
-        _buildMenuItem(context, Icons.group_outlined, 'My Clubs', onTap: () {}),
+        _buildMenuItem(
+          context,
+          Icons.group_outlined,
+          'My Clubs',
+          onTap: () => context.push('/my-clubs'),
+        ),
         _buildMenuItem(
           context,
           Icons.history,
           'Activity History',
-          onTap: () {},
+          onTap: () => context.push('/activity-history'),
         ),
         _buildMenuItem(
           context,
           Icons.help_outline,
           'Help & Support',
-          onTap: () {},
+          onTap: () => context.push('/help-support'),
         ),
       ],
     );
   }
 
   Widget _buildMenuItem(
-    BuildContext context,
-    IconData icon,
-    String label, {
-    VoidCallback? onTap,
-  }) {
+      BuildContext context, IconData icon, String label,
+      {VoidCallback? onTap}) {
     return ListTile(
       leading: Icon(icon, color: AppColors.textSecondary),
       title: Text(label),

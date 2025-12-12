@@ -47,19 +47,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDlW8fIp5Btbq3mwLhOYYcFOfkyGBaE6Ws',
-    appId: '1:511791365520:android:4ae74569a867828a258715',
-    messagingSenderId: '511791365520',
-    projectId: 'quadcnct',
-    storageBucket: 'quadcnct.firebasestorage.app',
+    apiKey: 'AIzaSyDUxOL2DneRrwYkzu19_GCGyCkEpPvIfVs',
+    appId: '1:1042290834058:android:40e4ca6990d0e498cacb73',
+    messagingSenderId: '1042290834058',
+    projectId: 'quadconnect-65159',
+    storageBucket: 'quadconnect-65159.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAhzRraKKu0OS4b7WiDp6hCF5MOnUDodwM',
-    appId: '1:511791365520:ios:7214572a9d472a0b258715',
-    messagingSenderId: '511791365520',
-    projectId: 'quadcnct',
-    storageBucket: 'quadcnct.firebasestorage.app',
+    apiKey: 'AIzaSyCst8z4uFe-85toJTd_ElntDlsYAFdznCE',
+    appId: '1:1042290834058:ios:fe477fce29ec7eedcacb73',
+    messagingSenderId: '1042290834058',
+    projectId: 'quadconnect-65159',
+    storageBucket: 'quadconnect-65159.firebasestorage.app',
     iosBundleId: 'com.quadconnect.quadcnct',
   );
 

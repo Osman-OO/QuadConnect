@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+
 /// Types of posts in the feed
 enum PostType { text, image, event, poll }
 
@@ -21,6 +22,9 @@ class PostModel {
   final DateTime createdAt;
   final DateTime? editedAt;
 
+  /// NEW: Indicates whether the user has saved this post
+  final bool isSaved;
+
   const PostModel({
     required this.id,
     required this.authorId,
@@ -37,6 +41,7 @@ class PostModel {
     this.isPinned = false,
     required this.createdAt,
     this.editedAt,
+    this.isSaved = false, // default false
   });
 
   factory PostModel.fromFirestore(DocumentSnapshot doc) {
@@ -60,6 +65,7 @@ class PostModel {
       isPinned: data['isPinned'] ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       editedAt: (data['editedAt'] as Timestamp?)?.toDate(),
+      isSaved: data['isSaved'] ?? false, // read from Firestore if exists
     );
   }
 
@@ -79,6 +85,7 @@ class PostModel {
       'isPinned': isPinned,
       'createdAt': Timestamp.fromDate(createdAt),
       'editedAt': editedAt != null ? Timestamp.fromDate(editedAt!) : null,
+      'isSaved': isSaved, // store in Firestore
     };
   }
 
@@ -98,6 +105,7 @@ class PostModel {
     bool? isPinned,
     DateTime? createdAt,
     DateTime? editedAt,
+    bool? isSaved, // new field
   }) {
     return PostModel(
       id: id ?? this.id,
@@ -115,10 +123,10 @@ class PostModel {
       isPinned: isPinned ?? this.isPinned,
       createdAt: createdAt ?? this.createdAt,
       editedAt: editedAt ?? this.editedAt,
+      isSaved: isSaved ?? this.isSaved,
     );
   }
 
   bool get hasImages => imageUrls.isNotEmpty;
   bool get wasEdited => editedAt != null;
 }
-

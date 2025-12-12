@@ -4,116 +4,85 @@ import 'package:go_router/go_router.dart';
 
 import '../core/widgets/main_shell.dart';
 import '../features/auth/providers/auth_provider.dart';
+
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/signup_screen.dart';
 import '../features/auth/screens/splash_screen.dart';
 import '../features/feed/screens/feed_screen.dart';
+import '../features/feed/screens/saved_posts_screen.dart';
+import '../features/feed/models/post_model.dart';
+
 import '../features/events/screens/events_screen.dart';
 import '../features/messages/screens/messages_screen.dart';
 import '../features/profile/screens/profile_screen.dart';
 
-// Navigation keys for nested navigation
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
-// Router provider
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authNotifierProvider);
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
-    debugLogDiagnostics: false, // Disable for production
-    // Redirect based on auth state
+    debugLogDiagnostics: false,
     redirect: (context, state) {
       final isAuthenticated = authState.isAuthenticated;
-      final isAuthRoute =
-          state.matchedLocation == '/login' ||
+      final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/signup' ||
           state.matchedLocation == '/splash' ||
           state.matchedLocation == '/forgot-password';
 
-      // Allow splash screen always
-      if (state.matchedLocation == '/splash') {
-        return null;
-      }
-
-      // If not authenticated and trying to access protected route
-      if (!isAuthenticated && !isAuthRoute) {
-        return '/login';
-      }
-
-      // If authenticated and on auth route (except splash), go to feed
-      if (isAuthenticated &&
-          isAuthRoute &&
-          state.matchedLocation != '/splash') {
+      if (!isAuthenticated && !isAuthRoute) return '/login';
+      if (isAuthenticated && isAuthRoute && state.matchedLocation != '/splash') {
         return '/feed';
       }
-
       return null;
     },
-
     routes: [
-      // Splash screen
-      GoRoute(
-        path: '/splash',
-        builder: (context, state) => const SplashScreen(),
-      ),
-
-      // Auth routes (no shell)
+      GoRoute(path: '/splash', builder: (context, state) => const SplashScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(
-        path: '/signup',
-        builder: (context, state) => const SignUpScreen(),
-      ),
-      GoRoute(
-        path: '/forgot-password',
-        builder: (context, state) => const _ForgotPasswordScreen(),
-      ),
-
-      // Main app shell with bottom navigation
+      GoRoute(path: '/signup', builder: (context, state) => const SignUpScreen()),
+      GoRoute(path: '/forgot-password', builder: (context, state) => const _ForgotPasswordScreen()),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
         builder: (context, state, child) {
-          // Determine current tab index from route
           int index = 0;
           final location = state.matchedLocation;
-          if (location.startsWith('/events')) {
-            index = 1;
-          } else if (location.startsWith('/messages')) {
-            index = 2;
-          } else if (location.startsWith('/profile')) {
-            index = 3;
-          }
-
+          if (location.startsWith('/events')) index = 1;
+          else if (location.startsWith('/messages')) index = 2;
+          else if (location.startsWith('/profile')) index = 3;
           return MainShell(currentIndex: index, child: child);
         },
         routes: [
           GoRoute(
             path: '/feed',
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: FeedScreen()),
+            pageBuilder: (context, state) => const NoTransitionPage(child: FeedScreen()),
           ),
           GoRoute(
             path: '/events',
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: EventsScreen()),
+            pageBuilder: (context, state) => const NoTransitionPage(child: EventsScreen()),
           ),
           GoRoute(
             path: '/messages',
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: MessagesScreen()),
+            pageBuilder: (context, state) => const NoTransitionPage(child: MessagesScreen()),
           ),
           GoRoute(
             path: '/profile',
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: ProfileScreen()),
+            pageBuilder: (context, state) => const NoTransitionPage(child: ProfileScreen()),
+            routes: [
+              GoRoute(
+                path: 'saved-posts', // nested route
+                builder: (context, state) {
+                  final posts = state.extra as List<PostModel>? ?? [];
+                  return SavedPostsScreen(savedPosts: posts);
+                },
+              ),
+            ],
           ),
         ],
       ),
     ],
-
-    // Error handling
     errorBuilder: (context, state) => Scaffold(
       body: Center(
         child: Column(
@@ -134,7 +103,6 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-// Placeholder for forgot password screen
 class _ForgotPasswordScreen extends StatelessWidget {
   const _ForgotPasswordScreen();
 
