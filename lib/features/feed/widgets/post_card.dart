@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/post_model.dart';
-
 import '../../feed/providers/feed_provider.dart';
 
 class PostCard extends ConsumerWidget {
@@ -12,7 +11,6 @@ class PostCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the like status
     final likeStatus = ref.watch(postLikeStatusProvider(post.id));
 
     return Card(
@@ -23,8 +21,11 @@ class PostCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Author row
+            /// ─────────────────────────────
+            /// Author row + 3-dot menu
+            /// ─────────────────────────────
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
                   radius: 20,
@@ -37,30 +38,62 @@ class PostCard extends ConsumerWidget {
                               ? post.authorName[0]
                               : '?',
                           style: const TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold),
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         )
                       : null,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  post.authorName,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.bold),
+
+                Expanded(
+                  child: Text(
+                    post.authorName,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+
+                /// 3-dot menu
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, size: 20),
+                  onSelected: (value) {
+                    if (value == 'delete') {
+                      _confirmDelete(context, ref);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text(
+                            'Delete',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
+
             const SizedBox(height: 8),
 
-            // Post content
+            /// Post content
             Text(
               post.content,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+
             const SizedBox(height: 8),
 
-            // Post images
+            /// Images
             if (post.hasImages)
               SizedBox(
                 height: 200,
@@ -76,17 +109,6 @@ class PostCard extends ConsumerWidget {
                         fit: BoxFit.cover,
                         width: 200,
                         height: 200,
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return Center(
-                            child: CircularProgressIndicator(
-                              value: progress.expectedTotalBytes != null
-                                  ? progress.cumulativeBytesLoaded /
-                                      progress.expectedTotalBytes!
-                                  : null,
-                            ),
-                          );
-                        },
                         errorBuilder: (_, __, ___) => Container(
                           color: AppColors.border,
                           width: 200,
@@ -98,13 +120,13 @@ class PostCard extends ConsumerWidget {
                   },
                 ),
               ),
+
             const SizedBox(height: 8),
 
-            // Stats & actions
+            /// Actions row
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Likes
                 _buildActionButton(
                   context,
                   icon: likeStatus.value ?? false
@@ -119,32 +141,31 @@ class PostCard extends ConsumerWidget {
                   },
                 ),
 
-                // Comments
                 _buildActionButton(
                   context,
                   icon: Icons.comment_outlined,
                   label: '${post.commentsCount}',
                   onTap: () {
-                    _showComments(context, ref);
+                    _showComments(context);
                   },
                 ),
 
-                // Shares
                 _buildActionButton(
                   context,
                   icon: Icons.share_outlined,
                   label: '${post.sharesCount}',
-                  onTap: () {
-                    // TODO: Implement share logic
-                  },
+                  onTap: () {},
                 ),
 
-                // Save
                 _buildActionButton(
                   context,
-                  icon: post.isSaved ? Icons.bookmark : Icons.bookmark_border,
+                  icon: post.isSaved
+                      ? Icons.bookmark
+                      : Icons.bookmark_border,
                   label: '',
-                  color: post.isSaved ? AppColors.secondary : AppColors.textSecondary,
+                  color: post.isSaved
+                      ? AppColors.secondary
+                      : AppColors.textSecondary,
                   onTap: () {
                     ref.read(feedProvider.notifier).toggleSave(post.id);
                   },
@@ -157,6 +178,7 @@ class PostCard extends ConsumerWidget {
     );
   }
 
+  /// Action button
   Widget _buildActionButton(
     BuildContext context, {
     required IconData icon,
@@ -184,11 +206,36 @@ class PostCard extends ConsumerWidget {
     );
   }
 
-  void _showComments(BuildContext context, WidgetRef ref) {
-    // TODO: Implement showing comments in bottom sheet
+  /// Confirm delete dialog
+  void _confirmDelete(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete post?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await ref.read(feedProvider.notifier).deletePost(post.id);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showComments(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      builder: (_) => const Center(child: Text('Comments feature coming soon')),
+      builder: (_) =>
+          const Center(child: Text('Comments feature coming soon')),
     );
   }
 }

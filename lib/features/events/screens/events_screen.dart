@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class EventsScreen extends StatefulWidget {
+import '../providers/events_provider.dart';
+import '../../auth/providers/auth_provider.dart';
+
+class EventsScreen extends ConsumerStatefulWidget {
   const EventsScreen({super.key});
 
   @override
-  State<EventsScreen> createState() => _EventsScreenState();
+  ConsumerState<EventsScreen> createState() => _EventsScreenState();
 }
 
-class _EventsScreenState extends State<EventsScreen>
+class _EventsScreenState extends ConsumerState<EventsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
@@ -21,7 +25,6 @@ class _EventsScreenState extends State<EventsScreen>
     "Clubs",
   ];
 
-  /// Maps UI labels → DB enum keys
   final Map<String, String> typeMap = {
     "Academic": "academic",
     "Social": "social",
@@ -37,41 +40,36 @@ class _EventsScreenState extends State<EventsScreen>
     _tabController = TabController(length: uiLabels.length, vsync: this);
   }
 
-  /// Fetches events by the internal enum name
   Stream<QuerySnapshot> _getEventsByType(String uiLabel) {
-    final dbValue = typeMap[uiLabel] ?? "academic";
-
     return FirebaseFirestore.instance
         .collection('events')
-        .where('type', isEqualTo: dbValue)
-        .orderBy('date', descending: false)
+        .where('type', isEqualTo: typeMap[uiLabel])
+        .orderBy('date')
         .snapshots();
   }
 
   @override
   Widget build(BuildContext context) {
+    final userId = ref.watch(authNotifierProvider).user?.uid;
+
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text("Events"),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
-          labelColor: Colors.blue,
-          unselectedLabelColor: Colors.black54,
-          tabs: uiLabels.map((l) => Tab(text: l)).toList(),
+          tabs: uiLabels.map((e) => Tab(text: e)).toList(),
         ),
       ),
-
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _openCreateEvent(context),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CreateEventScreen(typeMap: typeMap),
+          ),
+        ),
         child: const Icon(Icons.add),
       ),
-
-      // Tab Views (Each one filters events)
       body: TabBarView(
         controller: _tabController,
         children: uiLabels.map((label) {
@@ -83,18 +81,68 @@ class _EventsScreenState extends State<EventsScreen>
               }
 
               if (snapshot.data!.docs.isEmpty) {
-                return Center(
-                  child: Text(
-                    "No ${label.toLowerCase()} events yet.",
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                );
+                return Center(child: Text("No ${label.toLowerCase()} events"));
               }
 
               return ListView(
                 padding: const EdgeInsets.all(12),
                 children: snapshot.data!.docs.map((doc) {
-                  return _buildEventCard(doc);
+                  final data = doc.data() as Map<String, dynamic>;
+                  final date = DateTime.parse(data['date']);
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      title: Text(data['title']),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("📍 ${data['location']}"),
+                          Text("🗓 ${date.toLocal()}"),
+                          Text(data['description']),
+                          const SizedBox(height: 8),
+
+                          // RSVP BUTTON
+                          Consumer(
+                            builder: (_, ref, __) {
+                              final attending =
+                                  ref.watch(eventRsvpStatusProvider(doc.id));
+
+                              return ElevatedButton(
+                                onPressed: () {
+                                  ref
+                                      .read(eventsProvider.notifier)
+                                      .toggleRsvp(doc.id);
+                                },
+                                child: Text(
+                                  attending.value == true
+                                      ? "Cancel RSVP"
+                                      : "RSVP",
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+
+                      // DELETE (ORGANIZER ONLY)
+                      trailing: data['organizerId'] == userId
+                          ? PopupMenuButton(
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text("Delete"),
+                                ),
+                              ],
+                              onSelected: (_) {
+                                ref
+                                    .read(eventsProvider.notifier)
+                                    .deleteEvent(doc.id);
+                              },
+                            )
+                          : null,
+                    ),
+                  );
                 }).toList(),
               );
             },
@@ -103,76 +151,37 @@ class _EventsScreenState extends State<EventsScreen>
       ),
     );
   }
-
-  // -------------------------
-  // EVENT CARD
-  // -------------------------
-  Widget _buildEventCard(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      child: ListTile(
-        title: Text(data['title'] ?? "Untitled Event"),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (data['location'] != null)
-              Text("Location: ${data['location']}"),
-
-            if (data['date'] != null)
-              Text("Date: ${data['date']}"),
-
-            if (data['description'] != null)
-              Text("Description: ${data['description']}"),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // -------------------------
-  // CREATE EVENT PAGE
-  // -------------------------
-  void _openCreateEvent(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => CreateEventScreen(typeMap: typeMap)),
-    );
-  }
 }
 
 // =====================================================================
-// CREATE EVENT SCREEN
+// CREATE EVENT SCREEN (THIS WAS MISSING ❗)
 // =====================================================================
 
-class CreateEventScreen extends StatefulWidget {
+class CreateEventScreen extends ConsumerStatefulWidget {
   final Map<String, String> typeMap;
 
   const CreateEventScreen({super.key, required this.typeMap});
 
   @override
-  State<CreateEventScreen> createState() => _CreateEventScreenState();
+  ConsumerState<CreateEventScreen> createState() =>
+      _CreateEventScreenState();
 }
 
-class _CreateEventScreenState extends State<CreateEventScreen> {
+class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
   final _formKey = GlobalKey<FormState>();
 
   String? _title;
   String? _description;
   String? _location;
-  String? _selectedUILabel;
-  DateTime? _selectedDate;
+  String? _type;
+
+  DateTime? _date;
+  TimeOfDay? _time;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Create Event"),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-      ),
+      appBar: AppBar(title: const Text("Create Event")),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -180,45 +189,49 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           child: ListView(
             children: [
               TextFormField(
-                decoration: const InputDecoration(label: Text("Title")),
+                decoration: const InputDecoration(labelText: "Title"),
+                validator: (v) => v!.isEmpty ? "Required" : null,
                 onSaved: (v) => _title = v,
-                validator: (v) =>
-                    v!.isEmpty ? "Please enter a title" : null,
               ),
               const SizedBox(height: 12),
 
               TextFormField(
-                decoration: const InputDecoration(label: Text("Location")),
+                decoration: const InputDecoration(labelText: "Location"),
                 onSaved: (v) => _location = v,
               ),
               const SizedBox(height: 12),
 
               TextFormField(
-                decoration: const InputDecoration(label: Text("Description")),
+                decoration: const InputDecoration(labelText: "Description"),
                 maxLines: 3,
                 onSaved: (v) => _description = v,
               ),
               const SizedBox(height: 12),
 
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(label: Text("Event Type")),
-                items: widget.typeMap.keys.map((uiLabel) {
-                  return DropdownMenuItem(
-                    value: uiLabel,
-                    child: Text(uiLabel),
-                  );
-                }).toList(),
-                onChanged: (v) => setState(() => _selectedUILabel = v),
-                validator: (v) => v == null ? "Select a type" : null,
+              DropdownButtonFormField(
+                decoration: const InputDecoration(labelText: "Event Type"),
+                items: widget.typeMap.keys
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    .toList(),
+                validator: (v) => v == null ? "Required" : null,
+                onChanged: (v) => _type = v,
               ),
-
               const SizedBox(height: 12),
 
               ElevatedButton(
                 onPressed: _pickDate,
-                child: Text(_selectedDate == null
-                    ? "Pick Event Date"
-                    : "Selected: ${_selectedDate!.toLocal()}".split(' ')[0]),
+                child: Text(_date == null
+                    ? "Pick Date"
+                    : _date!.toLocal().toString().split(' ')[0]),
+              ),
+
+              ElevatedButton(
+                onPressed: _pickTime,
+                child: Text(
+                  _time == null
+                      ? "Pick Time"
+                      : _time!.format(context),
+                ),
               ),
 
               const SizedBox(height: 20),
@@ -234,9 +247,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
   }
 
-  // -------------------------
-  // DATE PICKER
-  // -------------------------
   Future<void> _pickDate() async {
     final result = await showDatePicker(
       context: context,
@@ -244,31 +254,38 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       firstDate: DateTime(2023),
       lastDate: DateTime(2030),
     );
-
-    if (result != null) {
-      setState(() => _selectedDate = result);
-    }
+    if (result != null) setState(() => _date = result);
   }
 
-  // -------------------------
-  // SAVE TO FIRESTORE
-  // -------------------------
-  void _saveEvent() async {
+  Future<void> _pickTime() async {
+    final result =
+        await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    if (result != null) setState(() => _time = result);
+  }
+
+  Future<void> _saveEvent() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_date == null || _time == null) return;
 
     _formKey.currentState!.save();
 
-    final dbValue = widget.typeMap[_selectedUILabel] ?? "academic";
+    final user = ref.read(authNotifierProvider).user!;
+    final combined = DateTime(
+      _date!.year,
+      _date!.month,
+      _date!.day,
+      _time!.hour,
+      _time!.minute,
+    );
 
-    await FirebaseFirestore.instance.collection("events").add({
-      "title": _title,
-      "description": _description,
-      "location": _location,
-      "type": dbValue,            // STORED ENUM VALUE
-      "date": _selectedDate != null
-          ? _selectedDate!.toIso8601String()
-          : null,
-      "createdAt": DateTime.now().toIso8601String(),
+    await FirebaseFirestore.instance.collection('events').add({
+      'title': _title,
+      'description': _description,
+      'location': _location,
+      'type': widget.typeMap[_type],
+      'date': combined.toIso8601String(),
+      'organizerId': user.uid,
+      'createdAt': DateTime.now().toIso8601String(),
     });
 
     Navigator.pop(context);
