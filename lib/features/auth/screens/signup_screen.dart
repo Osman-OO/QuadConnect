@@ -5,8 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/quad_button.dart';
 import '../../../core/widgets/quad_text_field.dart';
 import '../../../core/constants/app_constants.dart';
-import '../../auth/providers/auth_provider.dart';
-
+import '../providers/auth_provider.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
@@ -220,4 +219,3 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     );
   }
 }
-

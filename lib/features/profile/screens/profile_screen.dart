@@ -7,8 +7,10 @@ import '../../../core/widgets/quad_avatar.dart';
 import '../../../core/widgets/quad_button.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../feed/providers/feed_provider.dart';
-import '../../events/screens/events_screen.dart';
+import '../../events/screens/clubs_screen.dart';
+import '../../events/providers/clubs_provider.dart';
 
+import '../../events/screens/events_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -101,6 +103,9 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  // -------------------------
+  // PROFILE HEADER
+  // -------------------------
   Widget _buildProfileHeader(BuildContext context, user) {
     return Column(
       children: [
@@ -131,7 +136,7 @@ class ProfileScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.primaryLight.withValues(alpha: 0.2),
+              color: AppColors.primaryLight.withAlpha(50),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
@@ -161,6 +166,9 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  // -------------------------
+  // STATS ROW
+  // -------------------------
   Widget _buildStatsRow(BuildContext context, user) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -203,6 +211,9 @@ class ProfileScreen extends ConsumerWidget {
     return Container(height: 40, width: 1, color: AppColors.border);
   }
 
+  // -------------------------
+  // MENU SECTION
+  // -------------------------
   Widget _buildMenuSection(BuildContext context, WidgetRef ref, user) {
     final feedState = ref.watch(feedProvider);
 
@@ -230,11 +241,7 @@ class ProfileScreen extends ConsumerWidget {
           'My Events',
           onTap: () {
             if (user?.uid != null) {
-              // Navigate to events screen with userId
-              context.push(
-                '/events',
-                extra: user!.uid,
-              );
+              context.push('/events', extra: user!.uid);
             }
           },
         ),
@@ -242,7 +249,15 @@ class ProfileScreen extends ConsumerWidget {
           context,
           Icons.group_outlined,
           'My Clubs',
-          onTap: () => context.push('/my-clubs'),
+          onTap: () {
+            if (user?.uid != null) {
+              // Navigate to ClubsScreen showing user-joined clubs
+              context.push(
+                '/my-clubs',
+                extra: user!.uid,
+              );
+            }
+          },
         ),
         _buildMenuItem(
           context,

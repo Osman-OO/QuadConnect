@@ -4,7 +4,9 @@ import '../../../services/firestore_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/club_model.dart';
 
-/// State for clubs list
+/// ---------------------------
+/// State for Clubs
+/// ---------------------------
 class ClubsState {
   final List<ClubModel> clubs;
   final String? selectedCategory;
@@ -41,20 +43,25 @@ class ClubsState {
   List<ClubModel> get filteredClubs {
     var result = clubs;
     if (selectedCategory != null) {
-      result = result.where((c) => c.category.toLowerCase() == selectedCategory!.toLowerCase()).toList();
+      result = result
+          .where((c) => c.category.toLowerCase() == selectedCategory!.toLowerCase())
+          .toList();
     }
     if (searchQuery.isNotEmpty) {
       final query = searchQuery.toLowerCase();
-      result = result.where((c) =>
-        c.name.toLowerCase().contains(query) ||
-        c.description.toLowerCase().contains(query)
-      ).toList();
+      result = result
+          .where((c) =>
+              c.name.toLowerCase().contains(query) ||
+              c.description.toLowerCase().contains(query))
+          .toList();
     }
     return result;
   }
 }
 
-/// Notifier for clubs
+/// ---------------------------
+/// Clubs Notifier
+/// ---------------------------
 class ClubsNotifier extends Notifier<ClubsState> {
   late final FirestoreService _firestoreService;
 
@@ -65,11 +72,7 @@ class ClubsNotifier extends Notifier<ClubsState> {
     return const ClubsState(isLoading: true);
   }
 
-  /// Add a club locally (for sample/demo clubs)
-  void addLocalClub(ClubModel club) {
-    state = state.copyWith(clubs: [...state.clubs, club]);
-  }
-
+  /// Subscribe to all clubs
   void _subscribeToClubs() {
     _firestoreService.clubs
         .orderBy('membersCount', descending: true)
@@ -85,6 +88,12 @@ class ClubsNotifier extends Notifier<ClubsState> {
     );
   }
 
+  /// Add a club locally (for demo/sample)
+  void addLocalClub(ClubModel club) {
+    state = state.copyWith(clubs: [...state.clubs, club]);
+  }
+
+  /// Set category filter
   void setCategory(String? category) {
     if (category == null) {
       state = state.copyWith(clearCategory: true);
@@ -93,10 +102,12 @@ class ClubsNotifier extends Notifier<ClubsState> {
     }
   }
 
+  /// Set search query
   void setSearchQuery(String query) {
     state = state.copyWith(searchQuery: query);
   }
 
+  /// Toggle membership (join/leave)
   Future<void> toggleMembership(String clubId) async {
     final authState = ref.read(authNotifierProvider);
     if (authState.user == null) return;
@@ -106,14 +117,17 @@ class ClubsNotifier extends Notifier<ClubsState> {
     final doc = await memberRef.get();
 
     if (doc.exists) {
+      // Leave club
       await memberRef.delete();
       await _firestoreService.clubs.doc(clubId).update({'membersCount': FieldValue.increment(-1)});
     } else {
+      // Join club
       await memberRef.set({'joinedAt': FieldValue.serverTimestamp()});
       await _firestoreService.clubs.doc(clubId).update({'membersCount': FieldValue.increment(1)});
     }
   }
 
+  /// Create a new club
   Future<void> createClub({
     required String name,
     required String description,
@@ -126,6 +140,7 @@ class ClubsNotifier extends Notifier<ClubsState> {
     if (authState.user == null) return;
 
     final userId = authState.user!.uid;
+
     try {
       final docRef = await _firestoreService.clubs.add({
         'name': name,
@@ -140,19 +155,17 @@ class ClubsNotifier extends Notifier<ClubsState> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
+      // Add current user as member
       await docRef.collection('members').doc(userId).set({'joinedAt': FieldValue.serverTimestamp()});
     } catch (e) {
       state = state.copyWith(error: 'Failed to create club: $e');
     }
   }
 
-  /// ----------------------
-  /// ✅ Delete a club
-  /// ----------------------
+  /// Delete a club
   Future<void> deleteClub(String clubId) async {
     try {
       await _firestoreService.clubs.doc(clubId).delete();
-      // Optional: update local state immediately
       state = state.copyWith(clubs: state.clubs.where((c) => c.id != clubId).toList());
     } catch (e) {
       state = state.copyWith(error: 'Failed to delete club: $e');
@@ -160,10 +173,12 @@ class ClubsNotifier extends Notifier<ClubsState> {
   }
 }
 
-/// Provider for clubs
+/// ---------------------------
+/// Providers
+/// ---------------------------
 final clubsProvider = NotifierProvider<ClubsNotifier, ClubsState>(() => ClubsNotifier());
 
-/// Stream provider for membership status
+/// Stream provider for membership status (joined/not joined)
 final clubMembershipProvider = StreamProvider.family<bool, String>((ref, clubId) {
   final authState = ref.watch(authNotifierProvider);
   if (authState.user == null) return Stream.value(false);
@@ -175,4 +190,29 @@ final clubMembershipProvider = StreamProvider.family<bool, String>((ref, clubId)
       .doc(authState.user!.uid)
       .snapshots()
       .map((doc) => doc.exists);
+});
+
+/// ---------------------------
+/// Stream provider for My Clubs (user-joined clubs)
+/// ---------------------------
+final myClubsProvider = StreamProvider<List<ClubModel>>((ref) {
+  final authState = ref.watch(authNotifierProvider);
+  if (authState.user == null) return const Stream.empty();
+
+  final userId = authState.user!.uid;
+  final firestore = ref.watch(firestoreServiceProvider);
+
+  return firestore.clubs.snapshots().asyncMap((snapshot) async {
+    final List<ClubModel> joined = [];
+
+    for (final doc in snapshot.docs) {
+      final memberDoc =
+          await doc.reference.collection('members').doc(userId).get();
+      if (memberDoc.exists) {
+        joined.add(ClubModel.fromFirestore(doc));
+      }
+    }
+
+    return joined;
+  });
 });
