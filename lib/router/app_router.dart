@@ -15,7 +15,7 @@ import '../features/feed/models/post_model.dart';
 import '../features/events/screens/events_screen.dart';
 import '../features/messages/screens/messages_screen.dart';
 import '../features/profile/screens/profile_screen.dart';
-
+import '../features/events/screens/clubs_screen.dart';
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -50,8 +50,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           int index = 0;
           final location = state.matchedLocation;
           if (location.startsWith('/events')) index = 1;
-          else if (location.startsWith('/messages')) index = 2;
-          else if (location.startsWith('/profile')) index = 3;
+          else if (location.startsWith('/clubs')) index = 2; // ✅ Clubs tab
+          else if (location.startsWith('/messages')) index = 3;
+          else if (location.startsWith('/profile')) index = 4;
           return MainShell(currentIndex: index, child: child);
         },
         routes: [
@@ -62,6 +63,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/events',
             pageBuilder: (context, state) => const NoTransitionPage(child: EventsScreen()),
+          ),
+          GoRoute(
+            path: '/clubs', // ✅ Clubs route
+            pageBuilder: (context, state) => const NoTransitionPage(child: ClubsScreen()),
           ),
           GoRoute(
             path: '/messages',

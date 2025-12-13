@@ -17,6 +17,67 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
   final _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _populateSampleClubs();
+    });
+  }
+
+  void _populateSampleClubs() {
+    final currentClubs = ref.read(clubsProvider).filteredClubs;
+    if (currentClubs.isEmpty) {
+      final sampleClubs = [
+        ClubModel(
+          id: '1',
+          name: 'Math Club',
+          category: 'Academic',
+          description: 'For students who love math.',
+          membersCount: 12,
+          createdAt: DateTime.now(),
+        ),
+        ClubModel(
+          id: '2',
+          name: 'Soccer Club',
+          category: 'Sports',
+          description: 'Join for weekly matches and tournaments.',
+          membersCount: 20,
+          createdAt: DateTime.now(),
+        ),
+        ClubModel(
+          id: '3',
+          name: 'Art Club',
+          category: 'Arts',
+          description: 'Express your creativity with peers.',
+          membersCount: 15,
+          createdAt: DateTime.now(),
+        ),
+        ClubModel(
+          id: '4',
+          name: 'Debate Club',
+          category: 'Academic',
+          description: 'Sharpen your public speaking skills.',
+          membersCount: 10,
+          createdAt: DateTime.now(),
+        ),
+        ClubModel(
+          id: '5',
+          name: 'Music Club',
+          category: 'Arts',
+          description: 'For students who love music.',
+          membersCount: 18,
+          createdAt: DateTime.now(),
+        ),
+      ];
+
+      final notifier = ref.read(clubsProvider.notifier);
+      for (var club in sampleClubs) {
+        notifier.addLocalClub(club);
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -25,15 +86,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
   @override
   Widget build(BuildContext context) {
     final clubsState = ref.watch(clubsProvider);
-    final categories = [
-      'All',
-      'Academic',
-      'Sports',
-      'Arts',
-      'Social',
-      'Professional',
-      'Cultural',
-    ];
+    final categories = ['All', 'Academic', 'Sports', 'Arts', 'Social', 'Professional', 'Cultural'];
 
     return Scaffold(
       appBar: AppBar(
@@ -47,9 +100,8 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
       ),
       body: Column(
         children: [
-          // Search bar
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
@@ -65,55 +117,55 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
                       )
                     : null,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
                 fillColor: AppColors.surfaceVariant,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               ),
               onChanged: (value) {
                 ref.read(clubsProvider.notifier).setSearchQuery(value);
               },
             ),
           ),
-          // Category filter chips
           SizedBox(
-            height: 44,
+            height: 36,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: categories.length,
               itemBuilder: (context, index) {
                 final cat = categories[index];
                 final isSelected =
                     (cat == 'All' && clubsState.selectedCategory == null) ||
-                    clubsState.selectedCategory == cat;
+                        clubsState.selectedCategory == cat;
                 return Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.only(right: 6),
                   child: FilterChip(
-                    label: Text(cat),
+                    label: Text(
+                      cat,
+                      style: const TextStyle(fontSize: 11),
+                    ),
                     selected: isSelected,
                     onSelected: (_) {
-                      ref
-                          .read(clubsProvider.notifier)
-                          .setCategory(cat == 'All' ? null : cat);
+                      ref.read(clubsProvider.notifier).setCategory(cat == 'All' ? null : cat);
                     },
                     selectedColor: AppColors.primaryLight,
                     checkmarkColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   ),
                 );
               },
             ),
           ),
-          const SizedBox(height: 8),
-          // Clubs grid
+          const SizedBox(height: 6),
           Expanded(
             child: clubsState.isLoading
                 ? _buildSkeletonGrid()
                 : clubsState.filteredClubs.isEmpty
-                ? _buildEmptyState()
-                : _buildClubsGrid(clubsState.filteredClubs),
+                    ? _buildEmptyState()
+                    : _buildClubsGrid(clubsState.filteredClubs),
           ),
         ],
       ),
@@ -122,16 +174,16 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
 
   Widget _buildSkeletonGrid() {
     return GridView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.85,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        childAspectRatio: 0.8,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
       ),
       itemCount: 6,
       itemBuilder: (context, index) => const ShimmerEffect(
-        child: SkeletonBox(height: 180, borderRadius: 16),
+        child: SkeletonBox(height: 150, borderRadius: 12),
       ),
     );
   }
@@ -141,17 +193,11 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.groups_outlined, size: 64, color: AppColors.textTertiary),
-          const SizedBox(height: 16),
-          Text(
-            'No clubs found',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try a different search or create one!',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Icon(Icons.groups_outlined, size: 48, color: AppColors.textTertiary),
+          const SizedBox(height: 12),
+          Text('No clubs found', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
+          Text('Try a different search or create one!', style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );
@@ -159,15 +205,15 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
 
   Widget _buildClubsGrid(List<ClubModel> clubs) {
     return GridView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.85,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        childAspectRatio: 0.8,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
       ),
       itemCount: clubs.length,
-      itemBuilder: (context, index) => _ClubCard(club: clubs[index]),
+      itemBuilder: (context, index) => ClubCard(club: clubs[index]),
     );
   }
 
@@ -182,16 +228,16 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => Container(
-          height: MediaQuery.of(context).size.height * 0.7,
+          height: MediaQuery.of(context).size.height * 0.65,
           decoration: const BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 20,
-            right: 20,
-            top: 20,
+            left: 16,
+            right: 16,
+            top: 16,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -199,60 +245,32 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Create Club',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
+                  Text('Create Club', style: Theme.of(context).textTheme.titleMedium),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
                       TextField(
                         controller: nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Club Name',
-                          border: OutlineInputBorder(),
-                        ),
+                        decoration: const InputDecoration(labelText: 'Club Name', border: OutlineInputBorder()),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       TextField(
                         controller: descController,
                         maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Description',
-                          border: OutlineInputBorder(),
-                        ),
+                        decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
-                        initialValue: selectedCategory,
-                        decoration: const InputDecoration(
-                          labelText: 'Category',
-                          border: OutlineInputBorder(),
-                        ),
-                        items:
-                            [
-                                  'Academic',
-                                  'Sports',
-                                  'Arts',
-                                  'Social',
-                                  'Professional',
-                                  'Cultural',
-                                ]
-                                .map(
-                                  (c) => DropdownMenuItem(
-                                    value: c,
-                                    child: Text(c),
-                                  ),
-                                )
-                                .toList(),
+                        value: selectedCategory,
+                        decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
+                        items: ['Academic','Sports','Arts','Social','Professional','Cultural'].map(
+                          (c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12))),
+                        ).toList(),
                         onChanged: (v) => setState(() => selectedCategory = v!),
                       ),
                     ],
@@ -262,22 +280,18 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
               ElevatedButton(
                 onPressed: () async {
                   if (nameController.text.isNotEmpty) {
-                    await ref
-                        .read(clubsProvider.notifier)
-                        .createClub(
-                          name: nameController.text,
-                          description: descController.text,
-                          category: selectedCategory,
-                        );
-                    if (context.mounted) Navigator.pop(context);
+                    await ref.read(clubsProvider.notifier).createClub(
+                      name: nameController.text,
+                      description: descController.text,
+                      category: selectedCategory,
+                    );
+                    Navigator.pop(context);
                   }
                 },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: const Text('Create Club'),
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                child: const Text('Create Club', style: TextStyle(fontSize: 14)),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -286,233 +300,105 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
   }
 }
 
-/// Individual club card
-class _ClubCard extends ConsumerWidget {
+// ---------------------
+// Top-level ClubCard
+// ---------------------
+class ClubCard extends ConsumerWidget {
   final ClubModel club;
-
-  const _ClubCard({required this.club});
+  const ClubCard({required this.club, Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final membershipStatus = ref.watch(clubMembershipProvider(club.id));
-    final isMember = membershipStatus.maybeWhen(
-      data: (v) => v,
-      orElse: () => false,
-    );
+    final isMember = membershipStatus.maybeWhen(data: (v) => v, orElse: () => false);
 
     return QuadCard(
-      onTap: () => _showClubDetails(context, ref),
+      onTap: () {},
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Club logo/avatar
-          Center(
-            child: Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
-              ),
-              child: club.logoUrl != null
-                  ? ClipOval(
-                      child: Image.network(club.logoUrl!, fit: BoxFit.cover),
-                    )
-                  : Center(
-                      child: Text(
-                        club.name[0].toUpperCase(),
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: club.logoUrl != null
+                            ? ClipOval(child: Image.network(club.logoUrl!, fit: BoxFit.cover))
+                            : Center(
+                                child: Text(
+                                  club.name[0].toUpperCase(),
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                              ),
                       ),
                     ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Club name
-          Text(
-            club.name,
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          // Category badge
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                club.category,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.textSecondary,
+                    const SizedBox(height: 6),
+                    Text(
+                      club.name,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      club.description,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-          const Spacer(),
-          // Members count and join button
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${club.membersCount} members',
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: AppColors.textTertiary),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    ref.read(clubsProvider.notifier).deleteClub(club.id);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'delete', child: Text('Delete Club')),
+                ],
               ),
-              if (club.isVerified)
-                Icon(Icons.verified, size: 16, color: AppColors.primary),
             ],
           ),
-          const SizedBox(height: 8),
-          SizedBox(
+          const Spacer(),
+          Container(
             width: double.infinity,
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: ElevatedButton(
-              onPressed: () =>
-                  ref.read(clubsProvider.notifier).toggleMembership(club.id),
+              onPressed: () {
+                ref.read(clubsProvider.notifier).toggleMembership(club.id);
+              },
               style: ElevatedButton.styleFrom(
-                backgroundColor: isMember
-                    ? AppColors.success
-                    : AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                minimumSize: const Size(0, 32),
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                backgroundColor: isMember ? AppColors.primaryLight : AppColors.surfaceVariant,
               ),
-              child: Text(isMember ? 'Joined ✓' : 'Join'),
+              child: Text(
+                isMember ? 'Joined' : 'Join',
+                style: TextStyle(
+                  color: isMember ? AppColors.primary : AppColors.textPrimary,
+                  fontSize: 12,
+                ),
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showClubDetails(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      club.name[0].toUpperCase(),
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              club.name,
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                          ),
-                          if (club.isVerified) ...[
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.verified,
-                              size: 20,
-                              color: AppColors.primary,
-                            ),
-                          ],
-                        ],
-                      ),
-                      Text('${club.membersCount} members • ${club.category}'),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Text('About', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              club.description.isEmpty
-                  ? 'No description yet'
-                  : club.description,
-            ),
-            if (club.meetingSchedule.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.schedule),
-                title: const Text('Meeting Schedule'),
-                subtitle: Text(club.meetingSchedule),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ],
-            if (club.meetingLocation != null) ...[
-              ListTile(
-                leading: const Icon(Icons.location_on),
-                title: const Text('Meeting Location'),
-                subtitle: Text(club.meetingLocation!),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ],
-            const Spacer(),
-            Consumer(
-              builder: (context, ref, _) {
-                final membership = ref.watch(clubMembershipProvider(club.id));
-                final isMember = membership.maybeWhen(
-                  data: (v) => v,
-                  orElse: () => false,
-                );
-                return SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => ref
-                        .read(clubsProvider.notifier)
-                        .toggleMembership(club.id),
-                    icon: Icon(isMember ? Icons.check : Icons.add),
-                    label: Text(isMember ? 'Member' : 'Join Club'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isMember ? AppColors.success : null,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
       ),
     );
   }

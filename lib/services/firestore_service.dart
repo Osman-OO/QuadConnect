@@ -15,6 +15,9 @@ class FirestoreService {
   CollectionReference get posts => _db.collection('posts');
   CollectionReference get events => _db.collection('events');
 
+  // ✅ Added clubs collection
+  CollectionReference get clubs => _db.collection('clubs');
+
   /// ---------------------- POSTS ----------------------
 
   Future<DocumentReference> createPost(Map<String, dynamic> data) async {
@@ -91,19 +94,18 @@ class FirestoreService {
   /// ---------------------- EVENTS ----------------------
 
   Stream<List<EventModel>> streamUpcomingEvents({int limit = 20, String? category}) {
-  Query q = events.orderBy('startTime').limit(limit);
+    Query q = events.orderBy('startTime').limit(limit);
 
-  if (category != null) {
-    q = q.where('category', isEqualTo: category);
+    if (category != null) {
+      q = q.where('category', isEqualTo: category);
+    }
+
+    return q.snapshots().map(
+      (snapshot) => snapshot.docs
+          .map((doc) => EventModel.fromFirestore(doc))
+          .toList(),
+    );
   }
-
-  return q.snapshots().map(
-    (snapshot) => snapshot.docs
-        .map((doc) => EventModel.fromFirestore(doc))
-        .toList(),
-  );
-}
-
 
   Future<DocumentReference> createEvent(Map<String, dynamic> data) async {
     data['createdAt'] = FieldValue.serverTimestamp();

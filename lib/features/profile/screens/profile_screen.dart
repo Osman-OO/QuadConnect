@@ -6,10 +6,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/quad_avatar.dart';
 import '../../../core/widgets/quad_button.dart';
 import '../../auth/providers/auth_provider.dart';
-
-import '../../feed/models/post_model.dart';
 import '../../feed/providers/feed_provider.dart';
-import '../../feed/screens/saved_posts_screen.dart';
+import '../../events/screens/events_screen.dart';
+
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -25,9 +24,7 @@ class ProfileScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              // TODO: Navigate to settings
-            },
+            onPressed: () {},
           ),
         ],
       ),
@@ -64,7 +61,7 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 32),
-            _buildMenuSection(context, ref),
+            _buildMenuSection(context, ref, user),
             const SizedBox(height: 24),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -77,8 +74,7 @@ class ProfileScreen extends ConsumerWidget {
                     context: context,
                     builder: (context) => AlertDialog(
                       title: const Text('Sign Out'),
-                      content:
-                          const Text('Are you sure you want to sign out?'),
+                      content: const Text('Are you sure you want to sign out?'),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),
@@ -207,7 +203,7 @@ class ProfileScreen extends ConsumerWidget {
     return Container(height: 40, width: 1, color: AppColors.border);
   }
 
-  Widget _buildMenuSection(BuildContext context, WidgetRef ref) {
+  Widget _buildMenuSection(BuildContext context, WidgetRef ref, user) {
     final feedState = ref.watch(feedProvider);
 
     return Column(
@@ -232,7 +228,15 @@ class ProfileScreen extends ConsumerWidget {
           context,
           Icons.event_outlined,
           'My Events',
-          onTap: () => context.push('/my-events'),
+          onTap: () {
+            if (user?.uid != null) {
+              // Navigate to events screen with userId
+              context.push(
+                '/events',
+                extra: user!.uid,
+              );
+            }
+          },
         ),
         _buildMenuItem(
           context,

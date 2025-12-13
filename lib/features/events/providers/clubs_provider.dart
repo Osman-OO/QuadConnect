@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../services/firestore_service.dart';
 import '../../auth/providers/auth_provider.dart';
-
 import '../models/club_model.dart';
 
 /// State for clubs list
@@ -55,15 +54,20 @@ class ClubsState {
   }
 }
 
-/// Manages clubs
+/// Notifier for clubs
 class ClubsNotifier extends Notifier<ClubsState> {
-  late FirestoreService _firestoreService;
+  late final FirestoreService _firestoreService;
 
   @override
   ClubsState build() {
     _firestoreService = ref.watch(firestoreServiceProvider);
     _subscribeToClubs();
     return const ClubsState(isLoading: true);
+  }
+
+  /// Add a club locally (for sample/demo clubs)
+  void addLocalClub(ClubModel club) {
+    state = state.copyWith(clubs: [...state.clubs, club]);
   }
 
   void _subscribeToClubs() {
@@ -93,7 +97,6 @@ class ClubsNotifier extends Notifier<ClubsState> {
     state = state.copyWith(searchQuery: query);
   }
 
-  /// Join or leave a club
   Future<void> toggleMembership(String clubId) async {
     final authState = ref.read(authNotifierProvider);
     if (authState.user == null) return;
@@ -111,7 +114,6 @@ class ClubsNotifier extends Notifier<ClubsState> {
     }
   }
 
-  /// Create a new club
   Future<void> createClub({
     required String name,
     required String description,
@@ -137,10 +139,23 @@ class ClubsNotifier extends Notifier<ClubsState> {
         'meetingLocation': meetingLocation,
         'createdAt': FieldValue.serverTimestamp(),
       });
-      // Creator automatically joins
+
       await docRef.collection('members').doc(userId).set({'joinedAt': FieldValue.serverTimestamp()});
     } catch (e) {
       state = state.copyWith(error: 'Failed to create club: $e');
+    }
+  }
+
+  /// ----------------------
+  /// ✅ Delete a club
+  /// ----------------------
+  Future<void> deleteClub(String clubId) async {
+    try {
+      await _firestoreService.clubs.doc(clubId).delete();
+      // Optional: update local state immediately
+      state = state.copyWith(clubs: state.clubs.where((c) => c.id != clubId).toList());
+    } catch (e) {
+      state = state.copyWith(error: 'Failed to delete club: $e');
     }
   }
 }
@@ -161,4 +176,3 @@ final clubMembershipProvider = StreamProvider.family<bool, String>((ref, clubId)
       .snapshots()
       .map((doc) => doc.exists);
 });
-

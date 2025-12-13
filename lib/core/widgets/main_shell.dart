@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../theme/app_colors.dart';
 import '../../features/messages/providers/messages_provider.dart';
 
@@ -9,7 +10,11 @@ class MainShell extends ConsumerWidget {
   final Widget child;
   final int currentIndex;
 
-  const MainShell({super.key, required this.child, required this.currentIndex});
+  const MainShell({
+    super.key,
+    required this.child,
+    required this.currentIndex,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -50,10 +55,17 @@ class MainShell extends ConsumerWidget {
                   onTap: () => context.go('/events'),
                 ),
                 _NavItem(
+                  icon: Icons.groups_outlined,
+                  activeIcon: Icons.groups_rounded,
+                  label: 'Clubs',
+                  isActive: currentIndex == 2,
+                  onTap: () => context.go('/clubs'),
+                ),
+                _NavItem(
                   icon: Icons.chat_bubble_outline_rounded,
                   activeIcon: Icons.chat_bubble_rounded,
                   label: 'Messages',
-                  isActive: currentIndex == 2,
+                  isActive: currentIndex == 3,
                   badge: unreadCount.when(
                     data: (count) => count > 0 ? count : null,
                     loading: () => null,
@@ -65,7 +77,7 @@ class MainShell extends ConsumerWidget {
                   icon: Icons.person_outline_rounded,
                   activeIcon: Icons.person_rounded,
                   label: 'Profile',
-                  isActive: currentIndex == 3,
+                  isActive: currentIndex == 4,
                   onTap: () => context.go('/profile'),
                 ),
               ],
@@ -116,7 +128,8 @@ class _NavItem extends StatelessWidget {
               children: [
                 Icon(
                   isActive ? activeIcon : icon,
-                  color: isActive ? AppColors.primary : AppColors.textTertiary,
+                  color:
+                      isActive ? AppColors.primary : AppColors.textTertiary,
                   size: 24,
                 ),
                 if (badge != null)
@@ -151,8 +164,10 @@ class _NavItem extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                color: isActive ? AppColors.primary : AppColors.textTertiary,
+                fontWeight:
+                    isActive ? FontWeight.w600 : FontWeight.normal,
+                color:
+                    isActive ? AppColors.primary : AppColors.textTertiary,
               ),
             ),
           ],
